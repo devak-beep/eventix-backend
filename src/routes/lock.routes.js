@@ -7,8 +7,8 @@ const express = require("express");
 // Create router instance
 const router = express.Router();
 
-// Import controller function
-const { lockSeats } = require("../controllers/lock.controller");
+// Import controller functions
+const { lockSeats, getAllLocks } = require("../controllers/lock.controller");
 
 // ROUTE: POST /api/locks
 // Purpose: Lock/reserve seats for a user
@@ -18,6 +18,12 @@ const { lockSeats } = require("../controllers/lock.controller");
 // Why: Creates a temporary lock on seats while user completes payment
 // Expiration: Lock expires after 5 minutes if not used
 router.post("/", lockSeats);
+
+// ROUTE: GET /api/locks
+// Purpose: View all locks
+// Handler: getAllLocks function
+// Response: [lock1, lock2, ...]
+router.get("/", getAllLocks);
 
 // Export router so app.js can use it
 module.exports = router;

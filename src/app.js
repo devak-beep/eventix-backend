@@ -30,6 +30,7 @@ app.use("/api/events", eventRoutes); // Routes: POST /, GET /:id, POST /:eventId
 app.use("/api/locks", lockRoutes); // Route: POST /
 app.use("/api/bookings", bookingRoutes); // Routes: POST /confirm, POST /:id/confirm
 app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /intent
+app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
 
 // HEALTH CHECK ENDPOINT
 // GET /health → {"status": "OK"}

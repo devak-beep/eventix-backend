@@ -2,6 +2,36 @@ const mongoose = require("mongoose");
 const SeatLock = require("../models/SeatLock.model");
 const Event = require("../models/Event.model");
 
+// GET all locks or filter by eventId, userId, or status
+exports.getAllLocks = async (req, res) => {
+  try {
+    const { eventId, userId, status } = req.query;
+
+    // Build filter based on query parameters
+    const filter = {};
+    if (eventId) filter.eventId = eventId;
+    if (userId) filter.userId = userId;
+    if (status) filter.status = status;
+
+    const locks = await SeatLock.find(filter)
+      .populate("eventId", "name totalSeats availableSeats")
+      .populate("userId", "name email");
+
+    res.status(200).json({
+      success: true,
+      data: locks,
+      count: locks.length,
+      filter: Object.keys(filter).length > 0 ? filter : null,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching locks",
+      error: error.message,
+    });
+  }
+};
+
 exports.lockSeats = async (req, res) => {
   console.log("REQ BODY 👉", req.body);
 
