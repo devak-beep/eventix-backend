@@ -82,7 +82,7 @@ exports.confirmBooking = async (req, res) => {
       });
     }
 
-    const booking = await confirmBookingTransactional(lockId);
+    const booking = await confirmBookingTransactional(lockId, req.correlationId);
 
     res.status(201).json({
       success: true,
