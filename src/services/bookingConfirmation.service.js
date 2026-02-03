@@ -3,9 +3,10 @@ const SeatLock = require("../models/SeatLock.model");
 const Booking = require("../models/Booking.model");
 const Event = require("../models/Event.model");
 const { BOOKING_STATUS } = require("../utils/bookingStateMachine");
+const { logBookingStateChange } = require("../utils/logger");
 
 // ========== Called after seat lock is created ==========
-async function confirmBookingTransactional(lockId) {
+async function confirmBookingTransactional(lockId, correlationId = null) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -62,6 +63,17 @@ async function confirmBookingTransactional(lockId) {
 
     await session.commitTransaction();
     session.endSession();
+
+    // Log booking creation
+    await logBookingStateChange(
+      booking[0]._id,
+      null,
+      BOOKING_STATUS.PAYMENT_PENDING,
+      lock.userId,
+      correlationId,
+      lock.eventId,
+      'BOOKING_CREATED'
+    );
 
     return booking[0];
   } catch (error) {

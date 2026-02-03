@@ -9,6 +9,10 @@ const express = require("express");
 // Without this, errors in async functions would crash the server
 require("express-async-errors");
 
+// Import middleware
+const correlationMiddleware = require("./middlewares/correlation.middleware");
+const errorMiddleware = require("./middlewares/error.middleware");
+
 // Import all route files
 const userRoutes = require("./routes/user.routes"); // User registration/retrieval routes
 const eventRoutes = require("./routes/event.routes"); // Event creation/retrieval routes
@@ -17,6 +21,9 @@ const bookingRoutes = require("./routes/booking.routes"); // Booking confirmatio
 
 // Create Express app instance
 const app = express();
+
+// MIDDLEWARE: Correlation ID for request tracking
+app.use(correlationMiddleware);
 
 // MIDDLEWARE: Enable JSON parsing
 // This allows the server to read JSON from request bodies
@@ -31,6 +38,7 @@ app.use("/api/locks", lockRoutes); // Route: POST /
 app.use("/api/bookings", bookingRoutes); // Routes: POST /confirm, POST /:id/confirm
 app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /intent
 app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
+app.use("/api/audit", require("./routes/audit.routes")); // Routes: GET /, GET /:bookingId
 
 // HEALTH CHECK ENDPOINT
 // GET /health → {"status": "OK"}
@@ -39,6 +47,9 @@ app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-lo
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
+
+// ERROR HANDLING MIDDLEWARE (must be last)
+app.use(errorMiddleware);
 
 // Export app so server.js can use it
 module.exports = app;
