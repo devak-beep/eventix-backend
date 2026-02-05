@@ -65,6 +65,20 @@ const bookingSchema = new mongoose.Schema(
       type: Date,
       required: false, // Optional field
     },
+
+    // FIELD: Payment amount for this booking
+    amount: {
+      type: Number,
+      required: false, // Optional for existing bookings
+      min: 0, // Cannot be negative
+    },
+
+    // FIELD: Refund amount (if payment failed and refund processed)
+    refundAmount: {
+      type: Number,
+      default: 0,
+      min: 0, // Cannot be negative
+    },
   },
   { timestamps: true }, // Add createdAt and updatedAt fields
 );

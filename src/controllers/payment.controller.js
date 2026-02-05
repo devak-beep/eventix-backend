@@ -1,21 +1,30 @@
 const Booking = require("../models/Booking.model");
 const SeatLock = require("../models/SeatLock.model");
 const Event = require("../models/Event.model");
+const PaymentAttempt = require("../models/PaymentAttempt.model");
 const {
   BOOKING_STATUS,
   canTransition,
 } = require("../utils/bookingStateMachine");
 const mongoose = require("mongoose");
 
-// ========== TASK 5.1: Payment Intent API ==========
+// ========== TASK 5.1: Payment Intent API with Idempotency ==========
 exports.createPaymentIntent = async (req, res) => {
-  const { bookingId, force } = req.body;
+  const { bookingId, amount, force, idempotencyKey } = req.body;
+  const correlationId = req.headers["x-correlation-id"] || `payment-${Date.now()}`;
 
   // 1️⃣ Basic validation
-  if (!bookingId || !force) {
+  if (!bookingId || !amount || !force || !idempotencyKey) {
     return res.status(400).json({
       success: false,
-      message: "bookingId and force are required",
+      message: "bookingId, amount, force, and idempotencyKey are required",
+    });
+  }
+
+  if (amount <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Amount must be greater than 0",
     });
   }
 
@@ -26,7 +35,31 @@ exports.createPaymentIntent = async (req, res) => {
     });
   }
 
-  // 2️⃣ Fetch booking
+  // 2️⃣ IDEMPOTENCY CHECK - Return existing payment attempt if found
+  const existingAttempt = await PaymentAttempt.findOne({ idempotencyKey });
+  if (existingAttempt) {
+    console.log(`[PAYMENT IDEMPOTENCY] Returning cached response for key: ${idempotencyKey}`);
+    
+    // Add retry flag to audit logs
+    await require("../utils/logger").logBookingStateChange(
+      bookingId,
+      "PAYMENT_RETRY",
+      "PAYMENT_RETRY",
+      null,
+      correlationId,
+      null,
+      "PAYMENT_RETRY",
+      { isRetry: true, originalAttemptId: existingAttempt._id }
+    );
+
+    return res.status(200).json({
+      ...existingAttempt.response,
+      isRetry: true,
+      originalAttemptId: existingAttempt._id,
+    });
+  }
+
+  // 3️⃣ Fetch booking
   const booking = await Booking.findById(bookingId);
 
   if (!booking) {
@@ -36,7 +69,7 @@ exports.createPaymentIntent = async (req, res) => {
     });
   }
 
-  // 3️⃣ Only PAYMENT_PENDING bookings can accept payment
+  // 4️⃣ Only PAYMENT_PENDING bookings can accept payment
   if (booking.status !== BOOKING_STATUS.PAYMENT_PENDING) {
     return res.status(400).json({
       success: false,
@@ -44,27 +77,49 @@ exports.createPaymentIntent = async (req, res) => {
     });
   }
 
-  // 4️⃣ Simulated outcomes
+  // 5️⃣ Create payment attempt record for idempotency
+  const paymentAttempt = await PaymentAttempt.create({
+    idempotencyKey,
+    bookingId,
+    amount,
+    forceResult: force,
+    correlationId,
+    status: "PROCESSING",
+  });
+
+  // 6️⃣ Store amount in booking
+  booking.amount = amount;
+  await booking.save();
+
+  let response;
+
+  // 7️⃣ Process payment based on force result
   if (force === "timeout") {
-    // Do NOTHING — expiry job will handle it
-    return res.status(200).json({
+    response = {
       success: true,
       paymentStatus: "TIMEOUT",
       message: "Payment timed out (simulated)",
-    });
+      amount: amount,
+      correlationId,
+    };
+    paymentAttempt.status = "TIMEOUT";
+  } else if (force === "failure") {
+    response = await handlePaymentFailure(bookingId, amount, res, correlationId, true);
+    paymentAttempt.status = "FAILED";
+  } else {
+    response = await handlePaymentSuccess(bookingId, amount, res, correlationId, true);
+    paymentAttempt.status = "SUCCESS";
   }
 
-  if (force === "failure") {
-    // TASK 5.3: Payment Failure Flow
-    return await handlePaymentFailure(bookingId, res);
-  }
+  // 8️⃣ Store response for future idempotency checks
+  paymentAttempt.response = response;
+  await paymentAttempt.save();
 
-  // TASK 5.2: Payment Success Flow
-  return await handlePaymentSuccess(bookingId, res);
+  return res.status(200).json(response);
 };
 
 // ========== TASK 5.2: Payment Success Flow ==========
-async function handlePaymentSuccess(bookingId, res) {
+async function handlePaymentSuccess(bookingId, amount, res, correlationId, returnData = false) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -75,24 +130,27 @@ async function handlePaymentSuccess(bookingId, res) {
     if (!booking) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({
+      const errorResponse = {
         success: false,
         message: "Booking not found",
-      });
+      };
+      return returnData ? errorResponse : res.status(404).json(errorResponse);
     }
 
     // 2️⃣ Verify state transition is valid
     if (!canTransition(booking.status, BOOKING_STATUS.CONFIRMED)) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({
+      const errorResponse = {
         success: false,
         message: "Invalid state transition to CONFIRMED",
-      });
+      };
+      return returnData ? errorResponse : res.status(400).json(errorResponse);
     }
 
-    // 3️⃣ Update booking to CONFIRMED
+    // 3️⃣ Update booking to CONFIRMED with amount
     booking.status = BOOKING_STATUS.CONFIRMED;
+    booking.amount = amount; // Store successful payment amount
     await booking.save({ session });
 
     // 4️⃣ Consume seat lock (mark as CONSUMED)
@@ -108,7 +166,7 @@ async function handlePaymentSuccess(bookingId, res) {
     await session.commitTransaction();
     session.endSession();
 
-    return res.status(200).json({
+    const successResponse = {
       success: true,
       paymentStatus: "SUCCESS",
       message: "Payment successful and booking confirmed",
@@ -119,21 +177,26 @@ async function handlePaymentSuccess(bookingId, res) {
         user: booking.user,
         seats: booking.seats,
       },
-    });
+      amount: booking.amount,
+      correlationId,
+    };
+
+    return returnData ? successResponse : res.status(200).json(successResponse);
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
-    return res.status(500).json({
+    const errorResponse = {
       success: false,
       message: "Payment success processing failed",
       error: error.message,
-    });
+    };
+    return returnData ? errorResponse : res.status(500).json(errorResponse);
   }
 }
 
-// ========== TASK 5.3: Payment Failure Flow ==========
-async function handlePaymentFailure(bookingId, res) {
+// ========== TASK 5.3: Payment Failure Flow with Refund ==========
+async function handlePaymentFailure(bookingId, amount, res, correlationId, returnData = false) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -144,24 +207,28 @@ async function handlePaymentFailure(bookingId, res) {
     if (!booking) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({
+      const errorResponse = {
         success: false,
         message: "Booking not found",
-      });
+      };
+      return returnData ? errorResponse : res.status(404).json(errorResponse);
     }
 
     // 2️⃣ Verify state transition is valid
     if (!canTransition(booking.status, BOOKING_STATUS.FAILED)) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({
+      const errorResponse = {
         success: false,
         message: "Invalid state transition to FAILED",
-      });
+      };
+      return returnData ? errorResponse : res.status(400).json(errorResponse);
     }
 
-    // 3️⃣ Update booking to FAILED
+    // 3️⃣ Update booking to FAILED with refund amount
     booking.status = BOOKING_STATUS.FAILED;
+    booking.amount = amount; // Store attempted payment amount
+    booking.refundAmount = amount; // Full refund for failed payment
     await booking.save({ session });
 
     // 4️⃣ Release seats: Restore availableSeats in Event
@@ -190,25 +257,31 @@ async function handlePaymentFailure(bookingId, res) {
     await session.commitTransaction();
     session.endSession();
 
-    return res.status(200).json({
+    const failureResponse = {
       success: true,
       paymentStatus: "FAILED",
-      message: "Payment failed and seats have been released",
+      message: "Payment failed, seats released, and refund processed",
       booking: {
         id: booking._id,
         status: booking.status,
         event: booking.event,
         user: booking.user,
       },
-    });
+      amount: booking.amount,
+      refundAmount: booking.refundAmount,
+      correlationId,
+    };
+
+    return returnData ? failureResponse : res.status(200).json(failureResponse);
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
-    return res.status(500).json({
+    const errorResponse = {
       success: false,
       message: "Payment failure processing failed",
       error: error.message,
-    });
+    };
+    return returnData ? errorResponse : res.status(500).json(errorResponse);
   }
 }

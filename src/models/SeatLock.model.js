@@ -33,12 +33,13 @@ const seatLockSchema = new mongoose.Schema(
     status: {
       type: String,
       // Can only be one of these values:
-      enum: ["ACTIVE", "EXPIRED", "CONSUMED"],
+      enum: ["ACTIVE", "EXPIRED", "CONSUMED", "CANCELLED"],
       default: "ACTIVE",
     },
     // ACTIVE: Lock is valid, user can still make booking
     // EXPIRED: Lock time passed, job cleaned it up, seats released
     // CONSUMED: Lock was converted to a booking
+    // CANCELLED: Booking was cancelled, seats released
 
     // FIELD: When this lock expires
     // If user doesn't complete booking by this time, lock becomes invalid

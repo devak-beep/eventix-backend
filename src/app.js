@@ -40,6 +40,7 @@ app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /in
 app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
 app.use("/api/audit", require("./routes/audit.routes")); // Routes: GET /, GET /:bookingId
 app.use("/api/reports", require("./routes/reports.routes")); // Routes: GET /booking-summary, GET /health-metrics
+app.use("/api/cancellations", require("./routes/cancellation.routes")); // Route: POST /:bookingId/cancel
 
 // HEALTH CHECK ENDPOINT
 // GET /health → {"status": "OK"}
