@@ -91,3 +91,47 @@ exports.lockSeats = async (req, res) => {
     });
   }
 };
+
+// Cancel a lock and restore seats
+exports.cancelLock = async (req, res) => {
+  const { lockId } = req.params;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const lock = await SeatLock.findById(lockId).session(session);
+
+    if (!lock) {
+      throw new Error("Lock not found");
+    }
+
+    if (lock.status !== "ACTIVE") {
+      throw new Error("Lock is not active");
+    }
+
+    // Restore seats
+    await Event.findByIdAndUpdate(
+      lock.eventId,
+      { $inc: { availableSeats: lock.seats } },
+      { session }
+    );
+
+    // Mark lock as cancelled
+    lock.status = "CANCELLED";
+    await lock.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({ success: true, message: "Lock cancelled" });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

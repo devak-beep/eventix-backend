@@ -17,7 +17,7 @@ const ALLOWED_TRANSITIONS = {
     BOOKING_STATUS.FAILED,
   ],
 
-  CONFIRMED: [],
+  CONFIRMED: [BOOKING_STATUS.CANCELLED], // Allow cancellation of confirmed bookings
   CANCELLED: [],
   EXPIRED: [],
   FAILED: [],

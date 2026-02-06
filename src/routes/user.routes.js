@@ -8,7 +8,7 @@ const express = require("express");
 const router = express.Router();
 
 // Import controller functions that handle requests
-const { registerUser, getUserById } = require("../controllers/user.controller");
+const { registerUser, loginUser, getUserById } = require("../controllers/user.controller");
 
 // ROUTE 1: POST /api/users/register
 // Purpose: Create a new user account
@@ -17,7 +17,14 @@ const { registerUser, getUserById } = require("../controllers/user.controller");
 // Response: {success: true, data: {_id, name, email, role}}
 router.post("/register", registerUser);
 
-// ROUTE 2: GET /api/users/:id
+// ROUTE 2: POST /api/users/login
+// Purpose: Login with email and password
+// Handler: loginUser function
+// Request body: {email, password}
+// Response: {success: true, data: user}
+router.post("/login", loginUser);
+
+// ROUTE 3: GET /api/users/:id
 // Purpose: Get user information by ID
 // Handler: getUserById function
 // URL parameter: id (user's MongoDB ID)

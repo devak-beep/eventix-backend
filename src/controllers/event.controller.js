@@ -6,26 +6,50 @@ const SeatLock = require("../models/SeatLock.model");
  * Create a new event
  */
 exports.createEvent = async (req, res) => {
-  const { name, description, eventDate, totalSeats } = req.body;
+  const { name, description, eventDate, totalSeats, type, category } = req.body;
 
-  if (!name || !eventDate || !totalSeats) {
+  if (!name || !eventDate || !totalSeats || !category) {
     return res.status(400).json({
       success: false,
-      message: "name, eventDate and totalSeats are required",
+      message: "name, eventDate, totalSeats, and category are required",
+    });
+  }
+
+  // Validate description
+  if (description && description.trim().length > 1500) {
+    return res.status(400).json({
+      success: false,
+      message: "Description must not exceed 1500 characters",
     });
   }
 
   const event = await Event.create({
     name,
-    description,
+    description: description ? description.trim() : '',
     eventDate,
     totalSeats,
     availableSeats: totalSeats,
+    type: type || "public", // Default to public
+    category,
   });
 
   res.status(201).json({
     success: true,
     data: event,
+  });
+};
+
+/**
+ * Get all public events
+ */
+exports.getAllPublicEvents = async (req, res) => {
+  const events = await Event.find({ type: "public" })
+    .select("name description eventDate totalSeats availableSeats type category createdAt")
+    .sort({ eventDate: 1 }); // Sort by event date (earliest first)
+
+  res.status(200).json({
+    success: true,
+    data: events,
   });
 };
 
@@ -64,12 +88,12 @@ exports.getEventById = async (req, res) => {
  */
 exports.lockSeats = async (req, res) => {
   const { eventId } = req.params;
-  const { seats, idempotencyKey } = req.body;
+  const { seats, userId, idempotencyKey } = req.body;
 
-  if (!seats || seats <= 0 || !idempotencyKey) {
+  if (!seats || seats <= 0 || !userId || !idempotencyKey) {
     return res.status(400).json({
       success: false,
-      message: "seats and idempotencyKey are required",
+      message: "seats, userId, and idempotencyKey are required",
     });
   }
 
@@ -114,6 +138,7 @@ exports.lockSeats = async (req, res) => {
       [
         {
           eventId,
+          userId,
           seats,
           idempotencyKey,
           status: "ACTIVE",

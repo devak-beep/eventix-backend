@@ -8,7 +8,7 @@ const express = require("express");
 const router = express.Router();
 
 // Import controller functions
-const { lockSeats, getAllLocks } = require("../controllers/lock.controller");
+const { lockSeats, getAllLocks, cancelLock } = require("../controllers/lock.controller");
 
 // ROUTE: POST /api/locks
 // Purpose: Lock/reserve seats for a user
@@ -24,6 +24,11 @@ router.post("/", lockSeats);
 // Handler: getAllLocks function
 // Response: [lock1, lock2, ...]
 router.get("/", getAllLocks);
+
+// ROUTE: POST /api/locks/:lockId/cancel
+// Purpose: Cancel a lock and restore seats
+// Handler: cancelLock function
+router.post("/:lockId/cancel", cancelLock);
 
 // Export router so app.js can use it
 module.exports = router;

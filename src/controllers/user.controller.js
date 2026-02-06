@@ -12,22 +12,30 @@ const User = require("../models/User.model");
  */
 exports.registerUser = async (req, res) => {
   // Extract user data from request body
-  // Example: {name: "John", email: "john@gmail.com", password: "123456", role: "user"}
   const { name, email, password, role } = req.body;
 
-  // ✅ VALIDATION STEP 1: Check if all required fields are provided
-  // name, email, password are mandatory. role is optional (defaults to "user")
+  // Validation: Check if all required fields are provided
   if (!name || !email || !password) {
     return res.status(400).json({
-      // status: 400 means "Bad Request" - client's fault
       success: false,
       message: "name, email, and password are required",
     });
   }
 
-  // ✅ VALIDATION STEP 2: Check if user with this email already exists
-  // This prevents duplicate accounts with same email
-  const existingUser = await User.findOne({ email });
+  // Normalize email to lowercase
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide a valid email address",
+    });
+  }
+
+  // Check if user with this email already exists (case-insensitive)
+  const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
     return res.status(400).json({
       success: false,
@@ -36,12 +44,12 @@ exports.registerUser = async (req, res) => {
   }
 
   try {
-    // ✅ CREATE USER: Save new user to MongoDB database
+    // Create user with normalized email
     const user = await User.create({
-      name, // User's full name
-      email, // User's email address
-      password, // User's password (⚠️ Should be hashed in production!)
-      role: role || "user", // Assign role, default to "user" if not provided
+      name: name.trim(),
+      email: normalizedEmail,
+      password,
+      role: role || "user",
     });
 
     // ✅ SEND SUCCESS RESPONSE with status 201 (Created)
@@ -101,6 +109,65 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching user",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * FUNCTION: Login user
+ * Purpose: Authenticate user with email and password
+ * Route: POST /api/users/login
+ */
+exports.loginUser = async (req, res) => {
+  // Extract credentials from request body
+  const { email, password } = req.body;
+
+  // Check if email and password are provided
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and password are required",
+    });
+  }
+
+  // Normalize email to lowercase
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    // Find user by normalized email
+    const user = await User.findOne({ email: normalizedEmail });
+
+    // Check if user exists
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Check if password matches (simple comparison - should use bcrypt in production)
+    if (user.password !== password) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Login successful - return user data (without password)
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error during login",
       error: error.message,
     });
   }

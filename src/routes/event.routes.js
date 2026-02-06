@@ -11,17 +11,24 @@ const router = express.Router();
 const {
   createEvent, // Creates a new event
   getEventById, // Fetches event by ID
+  getAllPublicEvents, // Fetches all public events
   lockSeats, // Locks seats for an event
 } = require("../controllers/event.controller");
 
 // ROUTE 1: POST /api/events
 // Purpose: Create a new event
 // Handler: createEvent function
-// Request body: {name, description, eventDate, totalSeats}
+// Request body: {name, description, eventDate, totalSeats, type}
 // Response: {success: true, data: event}
 router.post("/", createEvent);
 
-// ROUTE 2: GET /api/events/:id
+// ROUTE 2: GET /api/events
+// Purpose: Get all public events
+// Handler: getAllPublicEvents function
+// Response: {success: true, data: [events]}
+router.get("/", getAllPublicEvents);
+
+// ROUTE 3: GET /api/events/:id
 // Purpose: Get event details by ID
 // Handler: getEventById function
 // URL parameter: id (event's MongoDB ID)

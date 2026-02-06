@@ -51,6 +51,29 @@ const eventSchema = new mongoose.Schema(
         message: "Available seats cannot exceed total seats",
       },
     },
+
+    // FIELD: Event type (public or private)
+    // Public events are shown on home page
+    // Private events can only be accessed by ID
+    type: {
+      type: String,
+      enum: ["public", "private"], // Only these two values allowed
+      default: "public", // Default to public if not specified
+    },
+
+    // FIELD: Event category
+    category: {
+      type: String,
+      enum: [
+        "food-drink",
+        "sports-live",
+        "arts-theater",
+        "comedy-standup",
+        "movies-premieres",
+        "concerts-music",
+      ],
+      required: true,
+    },
   },
   // Add automatic timestamps
   { timestamps: true },
