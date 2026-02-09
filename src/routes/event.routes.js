@@ -12,6 +12,7 @@ const {
   createEvent, // Creates a new event
   getEventById, // Fetches event by ID
   getAllPublicEvents, // Fetches all public events
+  getMyEvents, // Fetches user's created events
   lockSeats, // Locks seats for an event
 } = require("../controllers/event.controller");
 
@@ -27,6 +28,13 @@ router.post("/", createEvent);
 // Handler: getAllPublicEvents function
 // Response: {success: true, data: [events]}
 router.get("/", getAllPublicEvents);
+
+// ROUTE 2.5: GET /api/events/my-events
+// Purpose: Get events created by user
+// Handler: getMyEvents function
+// Query param: userId
+// Response: {success: true, data: [events]}
+router.get("/my-events", getMyEvents);
 
 // ROUTE 3: GET /api/events/:id
 // Purpose: Get event details by ID

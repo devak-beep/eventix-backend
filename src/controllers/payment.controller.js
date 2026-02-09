@@ -47,18 +47,27 @@ exports.processPayment = async (req, res) => {
     }
 
     // Record payment attempt
+    const seatCount = Array.isArray(booking.seats) ? booking.seats.length : (booking.seats || 1);
     await PaymentAttempt.create({
       bookingId,
       idempotencyKey,
       forceResult: status.toLowerCase(), // Convert SUCCESS to success
       status: status === "SUCCESS" ? "SUCCESS" : status === "FAILURE" ? "FAILED" : "TIMEOUT",
-      amount: booking.seats * 100, // Dummy amount
+      amount: seatCount * 100, // Calculate from seats count
     });
 
     // Update booking based on payment status
     if (status === "SUCCESS") {
       booking.status = "CONFIRMED";
+      booking.amount = seatCount * 100; // Save the amount to booking
       await booking.save();
+      
+      // Mark the seat lock as CONSUMED to prevent seat restoration
+      if (booking.seatLockId) {
+        await SeatLock.findByIdAndUpdate(booking.seatLockId, {
+          status: "CONSUMED"
+        });
+      }
       
       return res.status(200).json({
         success: true,
@@ -72,7 +81,7 @@ exports.processPayment = async (req, res) => {
         
         // Restore seats
         await Event.findByIdAndUpdate(booking.event, {
-          $inc: { availableSeats: booking.seats.length || 1 },
+          $inc: { availableSeats: booking.seats.length },
         });
         
         return res.status(200).json({

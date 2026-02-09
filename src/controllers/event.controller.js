@@ -6,12 +6,34 @@ const SeatLock = require("../models/SeatLock.model");
  * Create a new event
  */
 exports.createEvent = async (req, res) => {
-  const { name, description, eventDate, totalSeats, type, category } = req.body;
+  const { name, description, eventDate, totalSeats, type, category, amount, currency, idempotencyKey } = req.body;
 
-  if (!name || !eventDate || !totalSeats || !category) {
+  if (!name || !eventDate || !totalSeats || !category || amount === undefined) {
     return res.status(400).json({
       success: false,
-      message: "name, eventDate, totalSeats, and category are required",
+      message: "name, eventDate, totalSeats, category, and amount are required",
+    });
+  }
+
+  // Idempotency check
+  if (idempotencyKey) {
+    const existingEvent = await Event.findOne({ idempotencyKey });
+    if (existingEvent) {
+      return res.status(200).json({
+        success: true,
+        data: existingEvent,
+        creationCharge: existingEvent.creationCharge,
+        message: `Event already created (idempotent). Creation charge: ₹${existingEvent.creationCharge}`,
+        isRetry: true,
+      });
+    }
+  }
+
+  // Validate amount
+  if (amount < 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Amount cannot be negative",
     });
   }
 
@@ -23,6 +45,20 @@ exports.createEvent = async (req, res) => {
     });
   }
 
+  // Calculate event creation charge based on scale
+  let creationCharge = 0;
+  if (totalSeats <= 50) {
+    creationCharge = 500;
+  } else if (totalSeats <= 100) {
+    creationCharge = 1000;
+  } else if (totalSeats <= 200) {
+    creationCharge = 1500;
+  } else if (totalSeats <= 500) {
+    creationCharge = 2500;
+  } else {
+    creationCharge = 5000;
+  }
+
   const event = await Event.create({
     name,
     description: description ? description.trim() : '',
@@ -31,11 +67,18 @@ exports.createEvent = async (req, res) => {
     availableSeats: totalSeats,
     type: type || "public", // Default to public
     category,
+    amount,
+    currency: currency || "INR",
+    creationCharge,
+    createdBy: req.body.userId, // Store who created the event
+    idempotencyKey: idempotencyKey || null,
   });
 
   res.status(201).json({
     success: true,
     data: event,
+    creationCharge,
+    message: `Event created successfully. Creation charge: ₹${creationCharge}`,
   });
 };
 
@@ -44,12 +87,36 @@ exports.createEvent = async (req, res) => {
  */
 exports.getAllPublicEvents = async (req, res) => {
   const events = await Event.find({ type: "public" })
-    .select("name description eventDate totalSeats availableSeats type category createdAt")
+    .select("name description eventDate totalSeats availableSeats type category amount currency createdAt")
     .sort({ eventDate: 1 }); // Sort by event date (earliest first)
 
   res.status(200).json({
     success: true,
     data: events,
+  });
+};
+
+/**
+ * Get events created by a specific user
+ */
+exports.getMyEvents = async (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: "userId is required",
+    });
+  }
+
+  const events = await Event.find({ createdBy: userId })
+    .select("name description eventDate totalSeats availableSeats type category amount currency creationCharge createdAt")
+    .sort({ createdAt: -1 }); // Sort by creation date (newest first)
+
+  res.status(200).json({
+    success: true,
+    data: events,
+    count: events.length,
   });
 };
 
@@ -67,7 +134,7 @@ exports.getEventById = async (req, res) => {
   }
 
   const event = await Event.findById(id).select(
-    "name description eventDate totalSeats availableSeats createdAt",
+    "name description eventDate totalSeats availableSeats amount currency createdAt",
   );
 
   if (!event) {

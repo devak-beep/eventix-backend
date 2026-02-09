@@ -49,7 +49,7 @@ async function confirmBookingTransactional(lockId, correlationId = null) {
         {
           event: lock.eventId,
           user: lock.userId,
-          seats: lock.seats,
+          seats: Array.from({ length: lock.seats }, (_, i) => `SEAT-${i + 1}`),
           seatLockId: lockId,
           status: BOOKING_STATUS.PAYMENT_PENDING,
           paymentExpiresAt: new Date(Date.now() + 10 * 60 * 1000),

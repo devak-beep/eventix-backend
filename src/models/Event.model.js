@@ -74,6 +74,43 @@ const eventSchema = new mongoose.Schema(
       ],
       required: true,
     },
+
+    // FIELD: Ticket price per seat (in smallest currency unit, e.g., cents/paise)
+    // Store as integer to avoid floating point issues
+    // For payment gateway integration
+    amount: {
+      type: Number,
+      required: true,
+      min: [0, "Amount cannot be negative"],
+    },
+
+    // FIELD: Currency code (ISO 4217)
+    // Default to INR for Indian Rupees
+    currency: {
+      type: String,
+      default: "INR",
+      uppercase: true,
+    },
+
+    // FIELD: Event creation charge (platform fee)
+    creationCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // FIELD: User who created this event
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    // FIELD: Idempotency key for duplicate prevention
+    idempotencyKey: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow multiple nulls
+    },
   },
   // Add automatic timestamps
   { timestamps: true },
