@@ -16,7 +16,7 @@ exports.getAllBookings = async (req, res) => {
 
     const bookings = await Booking.find(filter)
       .populate("user", "name email")
-      .populate("event", "name totalSeats availableSeats");
+      .populate("event", "name totalSeats availableSeats image");
 
     res.status(200).json({
       success: true,
@@ -48,7 +48,7 @@ exports.getBookingById = async (req, res) => {
 
     const booking = await Booking.findById(id)
       .populate("user", "name email")
-      .populate("event", "name totalSeats availableSeats");
+      .populate("event", "name totalSeats availableSeats image");
 
     if (!booking) {
       return res.status(404).json({
