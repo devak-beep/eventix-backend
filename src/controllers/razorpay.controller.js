@@ -36,7 +36,7 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Booking not ready for payment" });
     }
 
-    const amount = booking.event.ticketPrice * booking.seats.length * 100; // Convert to paise
+    const amount = booking.event.amount * booking.seats.length * 100; // Convert to paise
 
     const options = {
       amount: amount,
