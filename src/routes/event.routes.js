@@ -16,12 +16,15 @@ const {
   lockSeats, // Locks seats for an event
 } = require("../controllers/event.controller");
 
+// Import auth middleware
+const { requireAdmin } = require("../middlewares/auth.middleware");
+
 // ROUTE 1: POST /api/events
-// Purpose: Create a new event
+// Purpose: Create a new event (Admin only)
 // Handler: createEvent function
-// Request body: {name, description, eventDate, totalSeats, type}
+// Request body: {name, description, eventDate, totalSeats, type, userId, userRole}
 // Response: {success: true, data: event}
-router.post("/", createEvent);
+router.post("/", requireAdmin, createEvent);
 
 // ROUTE 2: GET /api/events
 // Purpose: Get all public events

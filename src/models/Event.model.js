@@ -62,18 +62,19 @@ const eventSchema = new mongoose.Schema(
     },
 
     // FIELD: Event category
-    category: {
+    category: [{
       type: String,
       enum: [
         "food-drink",
+        "festivals-cultural",
+        "dance-party",
         "sports-live",
         "arts-theater",
         "comedy-standup",
         "movies-premieres",
         "concerts-music",
-      ],
-      required: true,
-    },
+      ]
+    }],
 
     // FIELD: Ticket price per seat (in smallest currency unit, e.g., cents/paise)
     // Store as integer to avoid floating point issues
@@ -103,6 +104,12 @@ const eventSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+    },
+
+    // FIELD: Event image (base64 encoded or URL)
+    image: {
+      type: String,
+      default: null,
     },
 
     // FIELD: Idempotency key for duplicate prevention

@@ -6,7 +6,7 @@ const SeatLock = require("../models/SeatLock.model");
  * Create a new event
  */
 exports.createEvent = async (req, res) => {
-  const { name, description, eventDate, totalSeats, type, category, amount, currency, idempotencyKey } = req.body;
+  const { name, description, eventDate, totalSeats, type, category, amount, currency, idempotencyKey, image } = req.body;
 
   if (!name || !eventDate || !totalSeats || !category || amount === undefined) {
     return res.status(400).json({
@@ -72,6 +72,7 @@ exports.createEvent = async (req, res) => {
     creationCharge,
     createdBy: req.body.userId, // Store who created the event
     idempotencyKey: idempotencyKey || null,
+    image: image || null, // Store base64 image
   });
 
   res.status(201).json({
@@ -87,7 +88,7 @@ exports.createEvent = async (req, res) => {
  */
 exports.getAllPublicEvents = async (req, res) => {
   const events = await Event.find({ type: "public" })
-    .select("name description eventDate totalSeats availableSeats type category amount currency createdAt")
+    .select("name description eventDate totalSeats availableSeats type category amount currency image createdAt")
     .sort({ eventDate: 1 }); // Sort by event date (earliest first)
 
   res.status(200).json({
@@ -134,7 +135,7 @@ exports.getEventById = async (req, res) => {
   }
 
   const event = await Event.findById(id).select(
-    "name description eventDate totalSeats availableSeats amount currency createdAt",
+    "name description eventDate totalSeats availableSeats amount currency image createdAt",
   );
 
   if (!event) {

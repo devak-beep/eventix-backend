@@ -79,6 +79,12 @@ const bookingSchema = new mongoose.Schema(
       default: 0,
       min: 0, // Cannot be negative
     },
+
+    // FIELD: Stripe checkout session ID
+    stripeSessionId: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }, // Add createdAt and updatedAt fields
 );

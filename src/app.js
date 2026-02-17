@@ -33,7 +33,9 @@ app.use(correlationMiddleware);
 // MIDDLEWARE: Enable JSON parsing
 // This allows the server to read JSON from request bodies
 // Example: POST /api/users/register with {"name": "John"}
-app.use(express.json());
+// Increase limit to handle base64 images (10MB)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // REGISTER ROUTES: Mount route handlers at different API endpoints
 // Example: POST /api/users/register → handled by userRoutes
@@ -42,6 +44,7 @@ app.use("/api/events", eventRoutes); // Routes: POST /, GET /:id, POST /:eventId
 app.use("/api/locks", lockRoutes); // Route: POST /
 app.use("/api/bookings", bookingRoutes); // Routes: POST /confirm, POST /:id/confirm
 app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /intent
+app.use("/api/stripe", require("./routes/stripe.routes")); // Stripe payment routes
 app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
 app.use("/api/audit", require("./routes/audit.routes")); // Routes: GET /, GET /:bookingId
 app.use("/api/reports", require("./routes/reports.routes")); // Routes: GET /booking-summary, GET /health-metrics
