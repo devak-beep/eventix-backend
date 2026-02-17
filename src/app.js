@@ -25,7 +25,15 @@ const bookingRoutes = require("./routes/booking.routes"); // Booking confirmatio
 const app = express();
 
 // MIDDLEWARE: Enable CORS (allows frontend to talk to backend)
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3001',
+    'https://eventix-frontend-8v2j.vercel.app',
+    'https://eventix-frontend-8v2j-44g0hf2yf.vercel.app',
+    /^https:\/\/eventix-frontend-.*\.vercel\.app$/
+  ],
+  credentials: true
+}));
 
 // MIDDLEWARE: Correlation ID for request tracking
 app.use(correlationMiddleware);
