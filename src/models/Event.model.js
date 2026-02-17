@@ -118,6 +118,35 @@ const eventSchema = new mongoose.Schema(
       unique: true,
       sparse: true, // Allow multiple nulls
     },
+
+    // FIELD: Payment status for event creation
+    paymentStatus: {
+      type: String,
+      enum: ['PENDING', 'PAID', 'FAILED'],
+      default: 'PENDING',
+    },
+
+    // FIELD: Razorpay order ID for event creation
+    razorpayOrderId: {
+      type: String,
+    },
+
+    // FIELD: Razorpay payment ID for event creation
+    razorpayPaymentId: {
+      type: String,
+    },
+
+    // FIELD: Event creation fee paid
+    creationFee: {
+      type: Number,
+      default: 0,
+    },
+
+    // FIELD: Whether event is published (after payment)
+    isPublished: {
+      type: Boolean,
+      default: false,
+    },
   },
   // Add automatic timestamps
   { timestamps: true },

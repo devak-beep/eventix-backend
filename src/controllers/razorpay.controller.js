@@ -194,3 +194,109 @@ exports.paymentFailed = async (req, res) => {
     });
   }
 };
+
+// Create Razorpay order for event creation
+exports.createEventOrder = async (req, res) => {
+  if (!razorpay) {
+    return res.status(503).json({ 
+      success: false, 
+      message: "Payment gateway not configured" 
+    });
+  }
+
+  const { eventId, amount } = req.body;
+
+  try {
+    const event = await Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    const amountInPaise = amount * 100;
+
+    const options = {
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `event_${eventId}`,
+      notes: {
+        eventId: eventId.toString(),
+        eventName: event.name,
+        purpose: 'event_creation'
+      }
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    // Store order ID in event
+    event.razorpayOrderId = order.id;
+    event.creationFee = amount;
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: process.env.RAZORPAY_KEY_ID
+    });
+  } catch (error) {
+    console.error('Razorpay event order creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment order',
+      error: error.message
+    });
+  }
+};
+
+// Verify Razorpay payment for event creation
+exports.verifyEventPayment = async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, eventId } = req.body;
+
+  try {
+    // Verify signature
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(sign.toString())
+      .digest("hex");
+
+    if (razorpay_signature !== expectedSign) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment signature"
+      });
+    }
+
+    // Payment verified, update event status
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    // Mark event as paid and published
+    event.paymentStatus = 'PAID';
+    event.razorpayPaymentId = razorpay_payment_id;
+    event.isPublished = true;
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Payment verified and event published",
+      event: {
+        id: event._id,
+        name: event.name,
+        paymentStatus: event.paymentStatus
+      }
+    });
+  } catch (error) {
+    console.error('Event payment verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Payment verification failed',
+      error: error.message
+    });
+  }
+};

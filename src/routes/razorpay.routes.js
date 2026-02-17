@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const razorpayController = require('../controllers/razorpay.controller');
 
-// Create Razorpay order
+// Booking payment routes
 router.post('/create-order', razorpayController.createOrder);
-
-// Verify payment
 router.post('/verify-payment', razorpayController.verifyPayment);
-
-// Handle payment failure
 router.post('/payment-failed', razorpayController.paymentFailed);
+
+// Event creation payment routes
+router.post('/create-event-order', razorpayController.createEventOrder);
+router.post('/verify-event-payment', razorpayController.verifyEventPayment);
 
 module.exports = router;
