@@ -16,16 +16,14 @@ const connectDB = async () => {
   try {
     // ✅ CONNECT: Use Mongoose to connect to MongoDB
     // process.env.MONGO_URI comes from .env file
-    // Example: mongodb://127.0.0.1:27017/event_booking?replicaSet=rs0
     await mongoose.connect(process.env.MONGO_URI);
 
     // ✅ Log success message when connected
-    console.log("MongoDB connected");
+    console.log("MongoDB connected successfully");
   } catch (error) {
-    // ❌ ERROR: If connection fails, log error and exit
+    // ❌ ERROR: If connection fails, log error and throw
     console.error("MongoDB connection failed:", error.message);
-    // Exit with code 1 (error exit) - server won't start without database
-    process.exit(1);
+    throw new Error(`Database connection failed: ${error.message}`);
   }
 };
 
