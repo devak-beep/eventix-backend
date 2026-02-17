@@ -5,13 +5,24 @@ const SeatLock = require("../models/SeatLock.model");
 const Event = require("../models/Event.model");
 const mongoose = require("mongoose");
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Initialize Razorpay only if keys are provided
+let razorpay = null;
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+  razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET
+  });
+}
 
 // Create Razorpay order
 exports.createOrder = async (req, res) => {
+  if (!razorpay) {
+    return res.status(503).json({ 
+      success: false, 
+      message: "Payment gateway not configured" 
+    });
+  }
+
   const { bookingId } = req.body;
 
   try {
