@@ -2,6 +2,7 @@ const winston = require('winston');
 require('winston-mongodb');
 const Audit = require('../models/Audit.model');
 
+// For serverless, only use console logging (no file system)
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -10,15 +11,13 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
     new winston.transports.Console({
       format: winston.format.simple()
     })
   ]
 });
 
-// Audit logger for booking state changes (file only)
+// Audit logger for booking state changes (console only in serverless)
 const auditLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -26,7 +25,7 @@ const auditLogger = winston.createLogger({
     winston.format.json()
   ),
   transports: [
-    new winston.transports.File({ filename: 'logs/audit.log' })
+    new winston.transports.Console()
   ]
 });
 
