@@ -85,6 +85,18 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+
+    // FIELD: Razorpay order ID
+    razorpayOrderId: {
+      type: String,
+      required: false,
+    },
+
+    // FIELD: Razorpay payment ID
+    razorpayPaymentId: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }, // Add createdAt and updatedAt fields
 );
