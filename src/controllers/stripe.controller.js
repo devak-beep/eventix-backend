@@ -1,9 +1,18 @@
 const Booking = require("../models/Booking.model");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+  : null;
 
 // Create Stripe checkout session
 exports.createCheckoutSession = async (req, res) => {
   const { bookingId } = req.params;
+
+  if (!stripe) {
+    return res.status(503).json({ 
+      success: false, 
+      message: "Payment gateway not configured" 
+    });
+  }
 
   try {
     const booking = await Booking.findById(bookingId).populate('event');
