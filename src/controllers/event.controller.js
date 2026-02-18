@@ -129,8 +129,9 @@ exports.getAllPublicEvents = async (req, res) => {
     userRole === "admin" || userRole === "superAdmin" ? {} : { type: "public" };
 
   const events = await Event.find(filter)
+    .populate("createdBy", "name email")
     .select(
-      "name description eventDate totalSeats availableSeats type category amount currency image createdAt",
+      "name description eventDate totalSeats availableSeats type category amount currency image createdAt createdBy",
     )
     .sort({ eventDate: 1 }); // Sort by event date (earliest first)
 
