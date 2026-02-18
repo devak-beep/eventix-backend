@@ -47,6 +47,21 @@ exports.registerUser = async (req, res) => {
   try {
     // If user is requesting admin role
     if (requestAdmin === true || role === "admin") {
+      // IDEMPOTENCY CHECK: Check if pending admin request already exists for this email
+      const existingRequest = await AdminRequest.findOne({
+        email: normalizedEmail,
+        status: "pending",
+      });
+
+      if (existingRequest) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "An admin request is already pending for this email. Please wait for approval.",
+          isAlreadyRequested: true, // Flag for frontend
+        });
+      }
+
       // Create user account but mark as unapproved
       const user = await User.create({
         name: name.trim(),
@@ -216,17 +231,29 @@ exports.loginUser = async (req, res) => {
  * FUNCTION: Get all pending admin requests
  * Purpose: Super admin views requests to become admin
  * Route: GET /api/users/admin-requests/pending
+ * IDEMPOTENCY: Only returns LATEST request per email (deduplicates)
  */
 exports.getAdminRequests = async (req, res) => {
   try {
-    // Get all pending requests with user details
-    const requests = await AdminRequest.find({ status: "pending" })
+    // Get all pending requests, sorted by creation date (newest first)
+    const allRequests = await AdminRequest.find({ status: "pending" })
       .populate("user", "name email")
       .sort({ createdAt: -1 });
 
+    // DEDUPLICATION: Keep only the latest request per email
+    const seenEmails = new Set();
+    const uniqueRequests = allRequests.filter((request) => {
+      if (seenEmails.has(request.email)) {
+        return false; // Skip duplicate emails
+      }
+      seenEmails.add(request.email);
+      return true; // Keep first (latest) occurrence
+    });
+
     res.status(200).json({
       success: true,
-      data: requests,
+      data: uniqueRequests,
+      count: uniqueRequests.length,
     });
   } catch (error) {
     res.status(500).json({
