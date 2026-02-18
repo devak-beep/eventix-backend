@@ -37,6 +37,16 @@ exports.createEvent = async (req, res) => {
     });
   }
 
+  // Validate event date is in the future
+  const selectedDate = new Date(eventDate);
+  const now = new Date();
+  if (selectedDate <= now) {
+    return res.status(400).json({
+      success: false,
+      message: "Event date and time must be in the future",
+    });
+  }
+
   // Validate description
   if (description && description.trim().length > 1500) {
     return res.status(400).json({
@@ -84,10 +94,15 @@ exports.createEvent = async (req, res) => {
 };
 
 /**
- * Get all public events
+ * Get all public events (or all events for admin)
  */
 exports.getAllPublicEvents = async (req, res) => {
-  const events = await Event.find({ type: "public" })
+  const { userRole } = req.query;
+  
+  // Admin sees all events (public + private), users see only public
+  const filter = userRole === 'admin' ? {} : { type: "public" };
+  
+  const events = await Event.find(filter)
     .select("name description eventDate totalSeats availableSeats type category amount currency image createdAt")
     .sort({ eventDate: 1 }); // Sort by event date (earliest first)
 
