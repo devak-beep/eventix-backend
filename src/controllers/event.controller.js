@@ -124,8 +124,9 @@ exports.createEvent = async (req, res) => {
 exports.getAllPublicEvents = async (req, res) => {
   const { userRole } = req.query;
 
-  // Admin sees all events (public + private), users see only public
-  const filter = userRole === "admin" ? {} : { type: "public" };
+  // Admin and superAdmin see all events (public + private), users see only public
+  const filter =
+    userRole === "admin" || userRole === "superAdmin" ? {} : { type: "public" };
 
   const events = await Event.find(filter)
     .select(
