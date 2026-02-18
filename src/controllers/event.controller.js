@@ -240,6 +240,13 @@ exports.lockSeats = async (req, res) => {
       throw new Error("Event not found");
     }
 
+    // Check if event has expired
+    const eventDate = new Date(event.eventDate);
+    const now = new Date();
+    if (eventDate <= now) {
+      throw new Error("Cannot book expired event");
+    }
+
     if (event.availableSeats < seats) {
       throw new Error("Not enough seats available");
     }
