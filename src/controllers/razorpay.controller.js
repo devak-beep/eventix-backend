@@ -244,7 +244,23 @@ exports.verifyEventPayment = async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature, eventData } = req.body;
 
   try {
-    // Verify signature
+    // Check if payment already verified (idempotency)
+    if (eventData.idempotencyKey) {
+      const existingEvent = await Event.findOne({ idempotencyKey: eventData.idempotencyKey });
+      if (existingEvent) {
+        return res.status(200).json({
+          success: true,
+          message: "Event already created with this payment",
+          event: {
+            id: existingEvent._id,
+            name: existingEvent.name,
+            paymentStatus: existingEvent.paymentStatus
+          }
+        });
+      }
+    }
+
+    // Verify signature to ensure payment is authentic
     const sign = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSign = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -254,7 +270,7 @@ exports.verifyEventPayment = async (req, res) => {
     if (razorpay_signature !== expectedSign) {
       return res.status(400).json({
         success: false,
-        message: "Invalid payment signature"
+        message: "Invalid payment signature - Payment cannot be verified"
       });
     }
 
@@ -279,22 +295,6 @@ exports.verifyEventPayment = async (req, res) => {
       });
     }
 
-    // Check idempotency
-    if (idempotencyKey) {
-      const existingEvent = await Event.findOne({ idempotencyKey });
-      if (existingEvent) {
-        return res.status(200).json({
-          success: true,
-          message: "Event already created",
-          event: {
-            id: existingEvent._id,
-            name: existingEvent.name,
-            paymentStatus: existingEvent.paymentStatus
-          }
-        });
-      }
-    }
-
     // Calculate creation charge
     let creationCharge = 0;
     if (totalSeats <= 50) creationCharge = 500;
@@ -309,42 +309,55 @@ exports.verifyEventPayment = async (req, res) => {
     else if (totalSeats <= 50000) creationCharge = 60000;
     else creationCharge = 100000;
 
-    // Create event with payment confirmed
-    const event = await Event.create({
-      name,
-      description: description ? description.trim() : '',
-      eventDate,
-      totalSeats,
-      availableSeats: totalSeats,
-      type: type || "public",
-      category,
-      amount,
-      currency: currency || "INR",
-      creationCharge,
-      createdBy: userId,
-      idempotencyKey: idempotencyKey || null,
-      image: image || null,
-      paymentStatus: 'PAID',
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      creationFee: creationCharge,
-      isPublished: true
-    });
+    // Use transaction to ensure event creation and payment recording are atomic
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    res.status(200).json({
-      success: true,
-      message: "Payment verified and event created successfully",
-      event: {
-        id: event._id,
-        name: event.name,
-        paymentStatus: event.paymentStatus
-      }
-    });
+    try {
+      // Create event with payment confirmed
+      const event = await Event.create([{
+        name,
+        description: description ? description.trim() : '',
+        eventDate,
+        totalSeats,
+        availableSeats: totalSeats,
+        type: type || "public",
+        category,
+        amount,
+        currency: currency || "INR",
+        creationCharge,
+        createdBy: userId,
+        idempotencyKey: idempotencyKey || null,
+        image: image || null,
+        paymentStatus: 'PAID',
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        creationFee: creationCharge,
+        isPublished: true
+      }], { session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.status(200).json({
+        success: true,
+        message: "Payment verified and event created successfully",
+        event: {
+          id: event[0]._id,
+          name: event[0].name,
+          paymentStatus: event[0].paymentStatus
+        }
+      });
+    } catch (sessionError) {
+      await session.abortTransaction();
+      session.endSession();
+      throw sessionError;
+    }
   } catch (error) {
     console.error('Event payment verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Payment verification failed',
+      message: 'Payment verification failed - event was not created',
       error: error.message
     });
   }
