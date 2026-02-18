@@ -32,22 +32,23 @@ exports.requireAdmin = (req, res, next) => {
 /**
  * Middleware to check if user has superAdmin role
  * Used to protect admin management routes
+ * Gets user info from x-user-role and x-user-id headers (sent from frontend)
  */
 exports.requireSuperAdmin = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Access denied. Authentication token required.",
-    });
-  }
-
   try {
-    // For now, we'll do a basic check. In production, decode JWT and verify role.
-    // This is a placeholder - actual implementation should verify JWT
-    const { userRole, userId } = req.headers;
+    // Get user info from custom headers (frontend sends these after login)
+    const userRole = req.headers["x-user-role"];
+    const userId = req.headers["x-user-id"];
 
+    // Check if headers are present
+    if (!userRole || !userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Access denied. Authentication required.",
+      });
+    }
+
+    // Check if user is superAdmin
     if (userRole !== "superAdmin") {
       return res.status(403).json({
         success: false,
@@ -62,7 +63,7 @@ exports.requireSuperAdmin = (req, res, next) => {
   } catch (err) {
     return res.status(401).json({
       success: false,
-      message: "Invalid token",
+      message: "Invalid authentication",
     });
   }
 };
