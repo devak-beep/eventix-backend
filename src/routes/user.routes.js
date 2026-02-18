@@ -8,7 +8,14 @@ const express = require("express");
 const router = express.Router();
 
 // Import controller functions that handle requests
-const { registerUser, loginUser, getUserById } = require("../controllers/user.controller");
+const {
+  registerUser,
+  loginUser,
+  getUserById,
+  getAdminRequests,
+  approveAdminRequest,
+  rejectAdminRequest,
+} = require("../controllers/user.controller");
 
 // ROUTE 1: POST /api/users/register
 // Purpose: Create a new user account
@@ -30,6 +37,26 @@ router.post("/login", loginUser);
 // URL parameter: id (user's MongoDB ID)
 // Response: {success: true, data: user}
 router.get("/:id", getUserById);
+
+// ROUTE 4: GET /api/users/admin-requests/pending
+// Purpose: Get all pending admin requests (super admin only)
+// Handler: getAdminRequests function
+// Response: {success: true, data: [requests]}
+router.get("/admin-requests/pending", getAdminRequests);
+
+// ROUTE 5: POST /api/users/admin-requests/:requestId/approve
+// Purpose: Approve an admin request (super admin only)
+// Handler: approveAdminRequest function
+// Request body: {superAdminId}
+// Response: {success: true, data: updatedRequest}
+router.post("/admin-requests/:requestId/approve", approveAdminRequest);
+
+// ROUTE 6: POST /api/users/admin-requests/:requestId/reject
+// Purpose: Reject an admin request (super admin only)
+// Handler: rejectAdminRequest function
+// Request body: {superAdminId, rejectionReason}
+// Response: {success: true, data: rejectedRequest}
+router.post("/admin-requests/:requestId/reject", rejectAdminRequest);
 
 // Export router so app.js can use it
 module.exports = router;
