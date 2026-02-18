@@ -62,23 +62,14 @@ exports.registerUser = async (req, res) => {
         });
       }
 
-      // Create user account but mark as unapproved
-      const user = await User.create({
+      // Create ONLY admin request - don't create user account yet
+      // User account will be created when SuperAdmin approves the request
+      const adminRequest = await AdminRequest.create({
         name: name.trim(),
         email: normalizedEmail,
-        password,
-        role: "user", // Start as regular user
-        isApproved: false, // Account not approved yet
-        adminRequestStatus: "pending", // Waiting for super admin approval
-        adminRequestDate: new Date(),
-      });
-
-      // Create admin request
-      await AdminRequest.create({
-        user: user._id,
-        name: user.name,
-        email: user.email,
+        password, // Store password temporarily for account creation on approval
         status: "pending",
+        createdAt: new Date(),
       });
 
       // ✅ SEND RESPONSE: Request submitted, waiting for approval
@@ -87,11 +78,10 @@ exports.registerUser = async (req, res) => {
         message:
           "Admin request submitted. Your account will be created once approved by a super admin.",
         data: {
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          adminRequestStatus: "pending",
+          _id: adminRequest._id,
+          name: adminRequest.name,
+          email: adminRequest.email,
+          status: "pending",
         },
         isAdminRequest: true, // Flag to show different message on frontend
       });
@@ -283,14 +273,19 @@ exports.approveAdminRequest = async (req, res) => {
       });
     }
 
-    // Update user role to admin and mark as approved
-    await User.findByIdAndUpdate(adminRequest.user, {
-      role: "admin",
-      isApproved: true,
+    // Create user account now that request is approved
+    const newUser = await User.create({
+      name: adminRequest.name,
+      email: adminRequest.email,
+      password: adminRequest.password, // Use stored password
+      role: "admin", // Approve as admin directly
+      isApproved: true, // Account is now approved
       adminRequestStatus: "approved",
+      adminRequestDate: new Date(),
     });
 
-    // Update admin request status
+    // Update admin request with user ID and approval details
+    adminRequest.user = newUser._id; // Link to created user
     adminRequest.status = "approved";
     adminRequest.approvedBy = superAdminId;
     adminRequest.approvalDate = new Date();
@@ -298,8 +293,16 @@ exports.approveAdminRequest = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Admin request approved successfully",
-      data: adminRequest,
+      message: "Admin request approved and account created successfully",
+      data: {
+        request: adminRequest,
+        user: {
+          _id: newUser._id,
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+        },
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -329,19 +332,16 @@ exports.rejectAdminRequest = async (req, res) => {
       });
     }
 
-    // Delete the user account
-    await User.findByIdAndDelete(adminRequest.user);
-
     // Update admin request status
     adminRequest.status = "rejected";
     adminRequest.approvedBy = superAdminId;
-    adminRequest.rejectionReason = rejectionReason || "";
+    adminRequest.rejectionReason = rejectionReason || "No reason provided";
     adminRequest.approvalDate = new Date();
     await adminRequest.save();
 
     res.status(200).json({
       success: true,
-      message: "Admin request rejected and account deleted",
+      message: "Admin request rejected successfully",
       data: adminRequest,
     });
   } catch (error) {

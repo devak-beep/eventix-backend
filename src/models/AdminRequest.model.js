@@ -6,20 +6,26 @@ const mongoose = require("mongoose");
 
 const adminRequestSchema = new mongoose.Schema(
   {
-    // User who requested to become admin
+    // User who requested to become admin (null until approved)
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
     },
 
-    // User details (stored at request time for approval)
+    // User details (stored at request time for account creation on approval)
     name: {
       type: String,
       required: true,
     },
 
     email: {
+      type: String,
+      required: true,
+    },
+
+    // Password for new account (stored until approved, then deleted from database)
+    password: {
       type: String,
       required: true,
     },
