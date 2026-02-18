@@ -178,9 +178,11 @@ exports.getEventById = async (req, res) => {
     });
   }
 
-  const event = await Event.findById(id).select(
-    "name description eventDate totalSeats availableSeats amount currency image createdAt",
-  );
+  const event = await Event.findById(id)
+    .populate("createdBy", "name email")
+    .select(
+      "name description eventDate totalSeats availableSeats amount currency image createdAt createdBy",
+    );
 
   if (!event) {
     return res.status(404).json({
