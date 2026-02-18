@@ -4,9 +4,34 @@ const SeatLock = require("../models/SeatLock.model");
 
 /**
  * Create a new event
+ * NOTE: This endpoint should NOT be used directly for event creation during payment flow.
+ * Use verifyEventPayment in razorpay.controller.js instead to ensure payment is verified first.
+ * This endpoint is kept for backward compatibility and admin direct creation only.
  */
 exports.createEvent = async (req, res) => {
-  const { name, description, eventDate, totalSeats, type, category, amount, currency, idempotencyKey, image } = req.body;
+  const {
+    name,
+    description,
+    eventDate,
+    totalSeats,
+    type,
+    category,
+    amount,
+    currency,
+    idempotencyKey,
+    image,
+    paymentVerified,
+  } = req.body;
+
+  // Safety check: if paymentVerified is not explicitly true, require payment to be made through Razorpay
+  // This prevents accidental event creation without payment
+  if (!paymentVerified && amount > 0) {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Event creation requires payment verification. Please use the payment flow.",
+    });
+  }
 
   if (!name || !eventDate || !totalSeats || !category || amount === undefined) {
     return res.status(400).json({
@@ -71,7 +96,7 @@ exports.createEvent = async (req, res) => {
 
   const event = await Event.create({
     name,
-    description: description ? description.trim() : '',
+    description: description ? description.trim() : "",
     eventDate,
     totalSeats,
     availableSeats: totalSeats,
@@ -98,12 +123,14 @@ exports.createEvent = async (req, res) => {
  */
 exports.getAllPublicEvents = async (req, res) => {
   const { userRole } = req.query;
-  
+
   // Admin sees all events (public + private), users see only public
-  const filter = userRole === 'admin' ? {} : { type: "public" };
-  
+  const filter = userRole === "admin" ? {} : { type: "public" };
+
   const events = await Event.find(filter)
-    .select("name description eventDate totalSeats availableSeats type category amount currency image createdAt")
+    .select(
+      "name description eventDate totalSeats availableSeats type category amount currency image createdAt",
+    )
     .sort({ eventDate: 1 }); // Sort by event date (earliest first)
 
   res.status(200).json({
@@ -126,7 +153,9 @@ exports.getMyEvents = async (req, res) => {
   }
 
   const events = await Event.find({ createdBy: userId })
-    .select("name description eventDate totalSeats availableSeats type category amount currency creationCharge createdAt")
+    .select(
+      "name description eventDate totalSeats availableSeats type category amount currency creationCharge createdAt",
+    )
     .sort({ createdAt: -1 }); // Sort by creation date (newest first)
 
   res.status(200).json({
