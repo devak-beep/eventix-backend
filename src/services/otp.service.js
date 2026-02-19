@@ -34,48 +34,137 @@ function createTransporter() {
 // -----------------------------------------------
 function buildEmailHtml(otp, purpose) {
   const isRegister = purpose === "register";
-  const title = isRegister
-    ? "Verify Your Email Address"
-    : "Login Verification Code";
+  const title = isRegister ? "Verify Your Email" : "Login Verification";
   const subtitle = isRegister
-    ? "You're almost there! Use the OTP below to complete your Eventix registration."
-    : "Someone is trying to log in to your Eventix account. Use the OTP below to confirm.";
+    ? "You're almost there! Enter the OTP below to complete your registration."
+    : "A login attempt was made to your Eventix account. Use the OTP below to confirm it was you.";
+  const badgeText = isRegister ? "Registration OTP" : "Login OTP";
+  const badgeColor = isRegister ? "#10b981" : "#3b82f6";
 
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
-      <div style="background: #fff; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        
-        <!-- Header -->
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #6c3de8; font-size: 28px; margin: 0;">Eventix</h1>
-          <p style="color: #888; font-size: 14px; margin: 4px 0 0;">Enterprise Event Management Platform</p>
-        </div>
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;">
 
-        <!-- Title -->
-        <h2 style="color: #1a1a2e; font-size: 22px; text-align: center;">${title}</h2>
-        <p style="color: #555; text-align: center; line-height: 1.6;">${subtitle}</p>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 
-        <!-- OTP Box -->
-        <div style="background: linear-gradient(135deg, #6c3de8, #a855f7); border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0;">
-          <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 0 0 10px;">Your One-Time Password</p>
-          <span style="font-size: 42px; font-weight: bold; letter-spacing: 12px; color: #fff; display: block;">${otp}</span>
-        </div>
+          <!-- HEADER / LOGO -->
+          <tr>
+            <td align="center" style="padding-bottom:28px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);border-radius:16px;padding:14px 28px;text-align:center;">
+                    <span style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:1px;">⚡ Eventix</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="color:#64748b;font-size:13px;margin:10px 0 0;">Enterprise Event Management Platform</p>
+            </td>
+          </tr>
 
-        <!-- Validity Note -->
-        <div style="background: #fff8e1; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
-          <p style="margin: 0; color: #7a6300; font-size: 14px;">
-            ⏱️ This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.
-          </p>
-        </div>
+          <!-- MAIN CARD -->
+          <tr>
+            <td style="background:#1e293b;border-radius:20px;border:1px solid #334155;overflow:hidden;">
 
-        <!-- Footer -->
-        <p style="color: #aaa; font-size: 12px; text-align: center; margin-top: 20px;">
-          If you didn't request this, you can safely ignore this email.<br/>
-          &copy; ${new Date().getFullYear()} Eventix. All rights reserved.
-        </p>
+              <!-- Top accent line -->
+              <div style="height:4px;background:linear-gradient(90deg,#1e3a8a,#3b82f6,#60a5fa);"></div>
 
-      </div>
-    </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 40px 36px;">
+
+                <!-- Badge -->
+                <tr>
+                  <td align="center" style="padding-bottom:20px;">
+                    <span style="background:${badgeColor}22;color:${badgeColor};font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 14px;border-radius:100px;border:1px solid ${badgeColor}44;">
+                      ${badgeText}
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- Title -->
+                <tr>
+                  <td align="center" style="padding-bottom:10px;">
+                    <h1 style="margin:0;font-size:26px;font-weight:800;color:#f1f5f9;">${title}</h1>
+                  </td>
+                </tr>
+
+                <!-- Subtitle -->
+                <tr>
+                  <td align="center" style="padding-bottom:32px;">
+                    <p style="margin:0;font-size:15px;color:#94a3b8;line-height:1.7;max-width:400px;">${subtitle}</p>
+                  </td>
+                </tr>
+
+                <!-- OTP Box -->
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <table cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#3b82f6 100%);border-radius:16px;padding:28px 40px;text-align:center;width:100%;">
+                      <tr>
+                        <td align="center">
+                          <p style="margin:0 0 12px;font-size:13px;color:rgba(255,255,255,0.7);letter-spacing:2px;text-transform:uppercase;font-weight:600;">Your One-Time Password</p>
+                          <span style="font-size:48px;font-weight:900;letter-spacing:16px;color:#ffffff;display:block;text-shadow:0 2px 12px rgba(0,0,0,0.3);">${otp}</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Timer warning -->
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <table cellpadding="0" cellspacing="0" style="background:#292524;border:1px solid #78716c;border-radius:10px;padding:12px 20px;">
+                      <tr>
+                        <td>
+                          <p style="margin:0;font-size:13px;color:#d6d3d1;">
+                            ⏱️ &nbsp;This OTP expires in <strong style="color:#fbbf24;">2 minutes</strong>. Do not share it with anyone.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Security tip -->
+                <tr>
+                  <td align="center" style="padding-bottom:4px;">
+                    <table cellpadding="0" cellspacing="0" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px 20px;width:100%;">
+                      <tr>
+                        <td>
+                          <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">
+                            🔒 &nbsp;<strong style="color:#94a3b8;">Security tip:</strong> Eventix will never call you to ask for this OTP. If you didn't request this, ignore this email — your account is safe.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td align="center" style="padding-top:24px;">
+              <p style="margin:0;font-size:12px;color:#475569;">
+                &copy; ${new Date().getFullYear()} Eventix &nbsp;·&nbsp; Enterprise Event Management
+              </p>
+              <p style="margin:6px 0 0;font-size:11px;color:#334155;">
+                This is an automated message. Please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
   `;
 }
 
