@@ -80,10 +80,10 @@ app.use(async (req, res, next) => {
     next();
   } catch (error) {
     console.error("[APP] DB connection error:", error.message);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: "Database connection failed",
-      details: error.message 
+      details: error.message,
     });
   }
 });

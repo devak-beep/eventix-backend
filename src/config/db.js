@@ -6,7 +6,7 @@
 const mongoose = require("mongoose");
 
 // Increase mongoose buffering timeout to 30 seconds
-mongoose.set('bufferTimeoutMS', 30000);
+mongoose.set("bufferTimeoutMS", 30000);
 
 // Track connection state
 let connectionPromise = null;
@@ -33,7 +33,10 @@ const connectDB = async () => {
 
   try {
     await connectionPromise;
-    console.log("[DB] MongoDB connected successfully, state:", mongoose.connection.readyState);
+    console.log(
+      "[DB] MongoDB connected successfully, state:",
+      mongoose.connection.readyState,
+    );
     return;
   } catch (error) {
     connectionPromise = null;

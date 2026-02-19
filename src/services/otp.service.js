@@ -42,32 +42,9 @@ function buildEmailHtml(otp, purpose) {
   const badgeColor = isRegister ? "#059669" : "#2563eb";
   const badgeBg = isRegister ? "#d1fae5" : "#dbeafe";
 
-  // Inline SVG logo (EventixLogoSimple — cyan circles, light mode palette)
-  const logoSvg = `
-    <svg width="48" height="48" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <radialGradient id="ecg1" cx="30%" cy="30%">
-          <stop offset="0%" stop-color="#7ee7fc"/>
-          <stop offset="100%" stop-color="#61dafb"/>
-        </radialGradient>
-        <radialGradient id="ecg2" cx="30%" cy="30%">
-          <stop offset="0%" stop-color="#61dafb"/>
-          <stop offset="100%" stop-color="#4fc3e8"/>
-        </radialGradient>
-        <radialGradient id="ecg3" cx="30%" cy="30%">
-          <stop offset="0%" stop-color="#4fc3e8"/>
-          <stop offset="100%" stop-color="#3daed5"/>
-        </radialGradient>
-      </defs>
-      <circle cx="20" cy="20" r="12" fill="url(#ecg1)" opacity="0.9"/>
-      <circle cx="50" cy="20" r="12" fill="url(#ecg2)" opacity="0.75"/>
-      <circle cx="80" cy="20" r="12" fill="url(#ecg3)" opacity="0.6"/>
-      <circle cx="20" cy="50" r="12" fill="url(#ecg1)" opacity="0.9"/>
-      <circle cx="50" cy="50" r="12" fill="url(#ecg2)" opacity="0.75"/>
-      <circle cx="20" cy="80" r="12" fill="url(#ecg1)" opacity="0.9"/>
-      <circle cx="50" cy="80" r="12" fill="url(#ecg2)" opacity="0.75"/>
-      <circle cx="80" cy="80" r="12" fill="url(#ecg3)" opacity="0.6"/>
-    </svg>`;
+  // Base64-encoded SVG logo (better email client compatibility than inline SVG)
+  const logoBase64 =
+    "PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCAxMjAgMTIwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjE0IiBmaWxsPSIjNjFkYWZiIi8+PGNpcmNsZSBjeD0iNTUiIGN5PSIyMCIgcj0iMTQiIGZpbGw9IiM0ZmMzZTgiIG9wYWNpdHk9IjAuODUiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjIwIiByPSIxNCIgZmlsbD0iIzNkYWVkNSIgb3BhY2l0eT0iMC43Ii8+PGNpcmNsZSBjeD0iMjAiIGN5PSI1NSIgcj0iMTQiIGZpbGw9IiM2MWRhZmIiLz48Y2lyY2xlIGN4PSI1NSIgY3k9IjU1IiByPSIxNCIgZmlsbD0iIzRmYzNlOCIgb3BhY2l0eT0iMC44NSIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iOTAiIHI9IjE0IiBmaWxsPSIjNjFkYWZiIi8+PGNpcmNsZSBjeD0iNTUiIGN5PSI5MCIgcj0iMTQiIGZpbGw9IiM0ZmMzZTgiIG9wYWNpdHk9IjAuODUiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjkwIiByPSIxNCIgZmlsbD0iIzNkYWVkNSIgb3BhY2l0eT0iMC43Ii8+PC9zdmc+";
 
   return `
 <!DOCTYPE html>
@@ -85,8 +62,8 @@ function buildEmailHtml(otp, purpose) {
             <td align="center" style="padding-bottom:24px;">
               <table cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center" valign="middle" style="padding-right:10px;">
-                    ${logoSvg}
+                  <td align="center" valign="middle" style="padding-right:12px;">
+                    <img src="data:image/svg+xml;base64,${logoBase64}" alt="Eventix" width="48" height="48" style="display:block;" />
                   </td>
                   <td align="left" valign="middle">
                     <span style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:0.5px;">Eventix</span>
