@@ -7,6 +7,8 @@
 const express = require("express");
 // Import CORS to allow frontend to talk to backend
 const cors = require("cors");
+// Import mongoose to check DB state
+const mongoose = require("mongoose");
 // Import middleware for automatic error handling in async functions
 // Without this, errors in async functions would crash the server
 require("express-async-errors");
@@ -14,6 +16,7 @@ require("express-async-errors");
 // Import middleware
 const correlationMiddleware = require("./middlewares/correlation.middleware");
 const errorMiddleware = require("./middlewares/error.middleware");
+const connectDB = require("./config/db");
 
 // Import all route files
 const userRoutes = require("./routes/user.routes"); // User registration/retrieval routes
@@ -63,6 +66,27 @@ app.use(correlationMiddleware);
 // Increase limit to handle base64 images (10MB)
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// MIDDLEWARE: Ensure database is connected before processing requests
+app.use(async (req, res, next) => {
+  // Skip DB check for health endpoint
+  if (req.path === "/health") {
+    return next();
+  }
+
+  try {
+    // Always ensure DB is connected - connectDB handles state checking internally
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("[APP] DB connection error:", error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: "Database connection failed",
+      details: error.message 
+    });
+  }
+});
 
 // REGISTER ROUTES: Mount route handlers at different API endpoints
 // Example: POST /api/users/register → handled by userRoutes

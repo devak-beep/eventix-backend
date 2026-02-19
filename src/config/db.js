@@ -3,28 +3,43 @@
 // Connects the app to MongoDB database
 // ============================================
 
-// Import Mongoose - MongoDB database driver for Node.js
 const mongoose = require("mongoose");
 
-/**
- * FUNCTION: Connect to MongoDB
- * Purpose: Establish connection to MongoDB database on server startup
- * Called by: server.js in the startServer() function
- * Uses: MONGO_URI from .env file
- */
+// Increase mongoose buffering timeout to 30 seconds
+mongoose.set('bufferTimeoutMS', 30000);
+
+// Track connection state
+let connectionPromise = null;
+
 const connectDB = async () => {
+  // If already connected, return immediately
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  // If connection is in progress, wait for it
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
+  console.log("[DB] Connecting to MongoDB...");
+  console.log("[DB] URI exists:", !!process.env.MONGO_URI);
+
+  connectionPromise = mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 30000,
+  });
+
   try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 3000,
-      connectTimeoutMS: 3000,
-      socketTimeoutMS: 5000,
-    });
-    console.log("MongoDB connected successfully");
+    await connectionPromise;
+    console.log("[DB] MongoDB connected successfully, state:", mongoose.connection.readyState);
+    return;
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
-    throw new Error(`Database connection failed: ${error.message}`);
+    connectionPromise = null;
+    console.error("[DB] MongoDB connection failed:", error.message);
+    throw error;
   }
 };
 
-// Export function so server.js can import and call it
 module.exports = connectDB;

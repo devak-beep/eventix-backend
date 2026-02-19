@@ -1,26 +1,22 @@
 require("dotenv").config();
 
 let app = null;
-let connectDB = null;
-let isConnected = false;
 
 module.exports = async (req, res) => {
+  console.log(`[VERCEL] ${req.method} ${req.url}`);
+
   try {
-    // Lazy-load app and db on first request (keeps cold start inside try/catch)
+    // Lazy-load app on first request
     if (!app) {
+      console.log("[VERCEL] Loading app...");
       app = require("./src/app");
-      connectDB = require("./src/config/db");
+      console.log("[VERCEL] App loaded");
     }
 
-    if (!isConnected) {
-      await connectDB();
-      isConnected = true;
-      console.log("Database connected in serverless function");
-    }
-
+    // Let Express app handle the request (app.js middleware handles DB connection)
     return app(req, res);
   } catch (error) {
-    console.error("Serverless function error:", error.message);
+    console.error("[VERCEL] Error:", error.message);
     if (!res.headersSent) {
       return res.status(500).json({
         error: "Server error",
