@@ -25,15 +25,34 @@ const bookingRoutes = require("./routes/booking.routes"); // Booking confirmatio
 const app = express();
 
 // MIDDLEWARE: Enable CORS (allows frontend to talk to backend)
-app.use(cors({
-  origin: [
-    'http://localhost:3001',
-    'https://eventix-frontend-8v2j.vercel.app',
-    'https://eventix-frontend-8v2j-44g0hf2yf.vercel.app',
-    /^https:\/\/eventix-frontend-.*\.vercel\.app$/
-  ],
-  credentials: true
-}));
+// Regex covers ALL vercel.app preview + production deployments for this project
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+
+      const allowed = [
+        /^http:\/\/localhost:\d+$/, // any localhost port
+        /^https:\/\/eventix-frontend[^.]*\.vercel\.app$/, // all eventix-frontend-*.vercel.app
+        /^https:\/\/eventix[^.]*\.vercel\.app$/, // any eventix*.vercel.app variant
+      ];
+
+      const isAllowed = allowed.some((pattern) => pattern.test(origin));
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Correlation-ID"],
+  }),
+);
+
+// Handle preflight OPTIONS requests for all routes
+app.options("*", cors());
 
 // MIDDLEWARE: Correlation ID for request tracking
 app.use(correlationMiddleware);
@@ -42,8 +61,8 @@ app.use(correlationMiddleware);
 // This allows the server to read JSON from request bodies
 // Example: POST /api/users/register with {"name": "John"}
 // Increase limit to handle base64 images (10MB)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // REGISTER ROUTES: Mount route handlers at different API endpoints
 // Example: POST /api/users/register → handled by userRoutes
