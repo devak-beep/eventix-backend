@@ -15,8 +15,11 @@ const mongoose = require("mongoose");
 const connectDB = async () => {
   try {
     // ✅ CONNECT: Use Mongoose to connect to MongoDB
-    // process.env.MONGO_URI comes from .env file
-    await mongoose.connect(process.env.MONGO_URI);
+    // Timeout set to 5s so Vercel (10s limit) can return a proper error before being killed
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000, // fail fast if Atlas unreachable
+      connectTimeoutMS: 5000,
+    });
 
     // ✅ Log success message when connected
     console.log("MongoDB connected successfully");
