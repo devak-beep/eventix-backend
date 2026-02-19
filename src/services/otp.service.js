@@ -42,9 +42,9 @@ function buildEmailHtml(otp, purpose) {
   const badgeColor = isRegister ? "#059669" : "#2563eb";
   const badgeBg = isRegister ? "#d1fae5" : "#dbeafe";
 
-  // Base64-encoded SVG logo (better email client compatibility than inline SVG)
-  const logoBase64 =
-    "PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCAxMjAgMTIwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjE0IiBmaWxsPSIjNjFkYWZiIi8+PGNpcmNsZSBjeD0iNTUiIGN5PSIyMCIgcj0iMTQiIGZpbGw9IiM0ZmMzZTgiIG9wYWNpdHk9IjAuODUiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjIwIiByPSIxNCIgZmlsbD0iIzNkYWVkNSIgb3BhY2l0eT0iMC43Ii8+PGNpcmNsZSBjeD0iMjAiIGN5PSI1NSIgcj0iMTQiIGZpbGw9IiM2MWRhZmIiLz48Y2lyY2xlIGN4PSI1NSIgY3k9IjU1IiByPSIxNCIgZmlsbD0iIzRmYzNlOCIgb3BhY2l0eT0iMC44NSIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iOTAiIHI9IjE0IiBmaWxsPSIjNjFkYWZiIi8+PGNpcmNsZSBjeD0iNTUiIGN5PSI5MCIgcj0iMTQiIGZpbGw9IiM0ZmMzZTgiIG9wYWNpdHk9IjAuODUiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjkwIiByPSIxNCIgZmlsbD0iIzNkYWVkNSIgb3BhY2l0eT0iMC43Ii8+PC9zdmc+";
+  // Use hosted logo URL for better email client compatibility
+  // Gmail and other clients block data: URIs, so we need a real HTTPS URL
+  const logoUrl = "https://eventix-frontend-8v2j.vercel.app/email-logo.png";
 
   return `
 <!DOCTYPE html>
@@ -63,7 +63,7 @@ function buildEmailHtml(otp, purpose) {
               <table cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" valign="middle" style="padding-right:12px;">
-                    <img src="data:image/svg+xml;base64,${logoBase64}" alt="Eventix" width="48" height="48" style="display:block;" />
+                    <img src="${logoUrl}" alt="Eventix" width="48" height="48" style="display:block;" />
                   </td>
                   <td align="left" valign="middle">
                     <span style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:0.5px;">Eventix</span>

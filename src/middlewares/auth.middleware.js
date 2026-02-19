@@ -17,15 +17,15 @@ exports.requireAdmin = (req, res, next) => {
     });
   }
 
-  // Check if user is admin
-  if (userRole !== "admin") {
+  // Check if user is admin or superAdmin (superAdmin has all admin privileges)
+  if (userRole !== "admin" && userRole !== "superAdmin") {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Admin privileges required to create events.",
+      message: "Access denied. Admin privileges required.",
     });
   }
 
-  // User is admin, proceed to next middleware/controller
+  // User is admin or superAdmin, proceed to next middleware/controller
   next();
 };
 
