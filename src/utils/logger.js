@@ -1,44 +1,50 @@
-const winston = require('winston');
-require('winston-mongodb');
-const Audit = require('../models/Audit.model');
+const winston = require("winston");
+const Audit = require("../models/Audit.model");
 
 // For serverless, only use console logging (no file system)
 const logger = winston.createLogger({
-  level: 'info',
+  level: "info",
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
-    winston.format.json()
+    winston.format.json(),
   ),
   transports: [
     new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+      format: winston.format.simple(),
+    }),
+  ],
 });
 
 // Audit logger for booking state changes (console only in serverless)
 const auditLogger = winston.createLogger({
-  level: 'info',
+  level: "info",
   format: winston.format.combine(
     winston.format.timestamp(),
-    winston.format.json()
+    winston.format.json(),
   ),
-  transports: [
-    new winston.transports.Console()
-  ]
+  transports: [new winston.transports.Console()],
 });
 
-async function logBookingStateChange(bookingId, fromState, toState, userId, correlationId, eventId = null, action = 'BOOKING_CREATED', metadata = {}) {
+async function logBookingStateChange(
+  bookingId,
+  fromState,
+  toState,
+  userId,
+  correlationId,
+  eventId = null,
+  action = "BOOKING_CREATED",
+  metadata = {},
+) {
   // 1. Log to file (existing functionality)
   auditLogger.info({
-    type: 'BOOKING_STATE_CHANGE',
+    type: "BOOKING_STATE_CHANGE",
     bookingId,
     fromState,
     toState,
     userId,
     correlationId,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   // 2. Store in MongoDB
@@ -52,11 +58,11 @@ async function logBookingStateChange(bookingId, fromState, toState, userId, corr
       correlationId,
       metadata: {
         ...metadata,
-        userId
-      }
+        userId,
+      },
     });
   } catch (error) {
-    logger.error('Failed to store audit record in MongoDB:', error);
+    logger.error("Failed to store audit record in MongoDB:", error);
   }
 }
 
@@ -66,7 +72,7 @@ function logError(error, context = {}, correlationId = null) {
     stack: error.stack,
     context,
     correlationId,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 }
 
