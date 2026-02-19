@@ -240,6 +240,80 @@ exports.updateEventImage = async (req, res) => {
 };
 
 /**
+ * Delete an event
+ * SuperAdmin can delete any event, Admin can only delete events they created
+ */
+exports.deleteEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { userId, userRole } = req.body;
+
+    if (!userId || !userRole) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and userRole are required",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID",
+      });
+    }
+
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    // Authorization check
+    const isCreator = event.createdBy && event.createdBy.toString() === userId;
+    const isSuperAdmin = userRole === "superAdmin";
+
+    if (!isSuperAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only delete events you created",
+      });
+    }
+
+    // Check if event has any confirmed bookings
+    const Booking = require("../models/Booking.model");
+    const confirmedBookings = await Booking.countDocuments({
+      event: eventId,
+      status: "CONFIRMED",
+    });
+
+    if (confirmedBookings > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete event with ${confirmedBookings} confirmed booking(s). Cancel all bookings first.`,
+      });
+    }
+
+    // Delete the event
+    await Event.findByIdAndDelete(eventId);
+
+    res.status(200).json({
+      success: true,
+      message: "Event deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete event",
+      error: error.message,
+    });
+  }
+};
+
+/**
  * Get event details by ID
  */
 exports.getEventById = async (req, res) => {

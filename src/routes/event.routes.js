@@ -15,6 +15,7 @@ const {
   getMyEvents, // Fetches user's created events
   lockSeats, // Locks seats for an event
   updateEventImage, // Updates event image
+  deleteEvent, // Deletes an event
 } = require("../controllers/event.controller");
 
 // Import auth middleware
@@ -62,6 +63,14 @@ router.post("/:eventId/lock", lockSeats);
 // Request body: {userId, userRole, image}
 // Response: {success: true, message, data}
 router.patch("/:eventId/image", requireAdmin, updateEventImage);
+
+// ROUTE 5: DELETE /api/events/:eventId
+// Purpose: Delete an event (SuperAdmin can delete any, Admin only their own)
+// Handler: deleteEvent function
+// URL parameter: eventId
+// Request body: {userId, userRole}
+// Response: {success: true, message}
+router.delete("/:eventId", requireAdmin, deleteEvent);
 
 // Export router so app.js can use it
 module.exports = router;
