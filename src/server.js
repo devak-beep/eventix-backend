@@ -17,6 +17,7 @@ const connectDB = require("./config/db");
 const recoverFromFailures = require("./jobs/failureRecovery.job"); // Runs once on startup
 const expireBookings = require("./jobs/bookingExpiry.job"); // Runs every 1 minute
 const expireLocks = require("./jobs/lockExpiry.job"); // Runs every 1 minute
+const deleteExpiredEvents = require("./jobs/eventExpiry.job"); // Runs every 60 minutes
 
 // Get server port from .env file, default to 3000 if not set
 const PORT = process.env.PORT || 3000;
@@ -51,6 +52,7 @@ const startServer = async () => {
   // They run automatically every 1 minute
   console.log("[JOBS] Lock expiry job started (runs every 1 minute)");
   console.log("[JOBS] Booking expiry job started (runs every 1 minute)");
+  console.log("[JOBS] Event expiry job started (runs every 60 minutes)");
 
   // STEP 4️⃣: START EXPRESS SERVER
   // Listen for incoming HTTP requests on the specified PORT

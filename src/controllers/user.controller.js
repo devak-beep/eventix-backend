@@ -5,14 +5,15 @@
 // Import User model (database schema)
 const User = require("../models/User.model");
 const AdminRequest = require("../models/AdminRequest.model");
+const { sendOtp, verifyOtp } = require("../services/otp.service");
 
 /**
- * FUNCTION: Register a new user
- * Purpose: Create a new user account in the database
+ * FUNCTION: Send OTP for registration (Step 1 of 2)
+ * Purpose: Validate registration data, then send OTP to user's email
  * Route: POST /api/users/register
+ * The user account is NOT created yet — only created after OTP is verified
  */
 exports.registerUser = async (req, res) => {
-  // Extract user data from request body
   const { name, email, password, role, requestAdmin } = req.body;
 
   // Validation: Check if all required fields are provided
@@ -35,7 +36,7 @@ exports.registerUser = async (req, res) => {
     });
   }
 
-  // Check if user with this email already exists (case-insensitive)
+  // Check if user with this email already exists
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
     return res.status(400).json({
@@ -45,74 +46,137 @@ exports.registerUser = async (req, res) => {
   }
 
   try {
-    // If user is requesting admin role
+    // For admin requests: check for existing pending request
     if (requestAdmin === true || role === "admin") {
-      // IDEMPOTENCY CHECK: Check if pending admin request already exists for this email
       const existingRequest = await AdminRequest.findOne({
         email: normalizedEmail,
         status: "pending",
       });
-
       if (existingRequest) {
         return res.status(400).json({
           success: false,
           message:
             "An admin request is already pending for this email. Please wait for approval.",
-          isAlreadyRequested: true, // Flag for frontend
+          isAlreadyRequested: true,
         });
       }
+    }
 
-      // Create ONLY admin request - don't create user account yet
-      // User account will be created when SuperAdmin approves the request
-      const adminRequest = await AdminRequest.create({
-        name: name.trim(),
+    // Store registration data temporarily and send OTP
+    await sendOtp(normalizedEmail, "register", {
+      name: name.trim(),
+      email: normalizedEmail,
+      password,
+      requestAdmin: requestAdmin === true || role === "admin",
+    });
+
+    // ✅ OTP sent — frontend will now show OTP input screen
+    return res.status(200).json({
+      success: true,
+      message:
+        "OTP sent to your email. Please verify to complete registration.",
+      requiresOtp: true,
+      email: normalizedEmail,
+    });
+  } catch (error) {
+    // If OTP was already sent recently, redirect to OTP screen with the existing OTP
+    if (error.code === "RATE_LIMITED") {
+      return res.status(200).json({
+        success: true,
+        message:
+          "An OTP was already sent to your email. Please check your inbox.",
+        requiresOtp: true,
         email: normalizedEmail,
-        password, // Store password temporarily for account creation on approval
+        alreadySent: true,
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "Error sending OTP. Please try again.",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * FUNCTION: Verify OTP and complete registration (Step 2 of 2)
+ * Purpose: Verify the OTP, then actually create the user account
+ * Route: POST /api/users/verify-register-otp
+ */
+exports.verifyRegisterOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required",
+    });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    // Verify the OTP (this also returns tempData stored during Step 1)
+    const result = await verifyOtp(normalizedEmail, otp, "register");
+
+    if (!result.valid) {
+      return res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    // OTP verified — now create the account using stored temp data
+    const { name, password, requestAdmin } = result.tempData;
+
+    if (requestAdmin) {
+      // Create admin request (same as before)
+      const adminRequest = await AdminRequest.create({
+        name,
+        email: normalizedEmail,
+        password,
         status: "pending",
         createdAt: new Date(),
       });
 
-      // ✅ SEND RESPONSE: Request submitted, waiting for approval
       return res.status(201).json({
         success: true,
         message:
-          "Admin request submitted. Your account will be created once approved by a super admin.",
+          "Email verified! Admin request submitted. Your account will be created once approved by a super admin.",
         data: {
           _id: adminRequest._id,
           name: adminRequest.name,
           email: adminRequest.email,
           status: "pending",
         },
-        isAdminRequest: true, // Flag to show different message on frontend
+        isAdminRequest: true,
       });
     }
 
-    // Regular user registration
+    // Regular user — create account now
     const user = await User.create({
-      name: name.trim(),
+      name,
       email: normalizedEmail,
       password,
       role: "user",
-      isApproved: true, // Regular users approved by default
+      isApproved: true,
     });
 
-    // ✅ SEND SUCCESS RESPONSE with status 201 (Created)
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: "Account created successfully!",
+      message: "Email verified! Account created successfully!",
       data: {
-        _id: user._id, // MongoDB unique ID
-        name: user.name, // User's name
-        email: user.email, // User's email
-        role: user.role, // User's role
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
       },
       isAdminRequest: false,
     });
   } catch (error) {
-    // ❌ ERROR HANDLING: If something goes wrong during creation
     res.status(500).json({
       success: false,
-      message: "Error creating user",
+      message: "Error verifying OTP",
       error: error.message,
     });
   }
@@ -159,15 +223,13 @@ exports.getUserById = async (req, res) => {
 };
 
 /**
- * FUNCTION: Login user
- * Purpose: Authenticate user with email and password
+ * FUNCTION: Login user (Step 1 of 2 — validate credentials and send OTP)
+ * Purpose: Verify email + password, then send OTP to user's email
  * Route: POST /api/users/login
  */
 exports.loginUser = async (req, res) => {
-  // Extract credentials from request body
   const { email, password } = req.body;
 
-  // Check if email and password are provided
   if (!email || !password) {
     return res.status(400).json({
       success: false,
@@ -175,14 +237,12 @@ exports.loginUser = async (req, res) => {
     });
   }
 
-  // Normalize email to lowercase
   const normalizedEmail = email.toLowerCase().trim();
 
   try {
-    // Find user by normalized email
+    // Find user by email
     const user = await User.findOne({ email: normalizedEmail });
 
-    // Check if user exists
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -190,7 +250,7 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // Check if password matches (simple comparison - should use bcrypt in production)
+    // Verify password
     if (user.password !== password) {
       return res.status(401).json({
         success: false,
@@ -198,9 +258,98 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // Login successful - return user data (without password)
-    res.status(200).json({
+    // If user has disabled OTP for login, skip OTP step and return user directly
+    if (user.otpEnabled === false) {
+      return res.status(200).json({
+        success: true,
+        message: "Login successful!",
+        requiresOtp: false,
+        data: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          otpEnabled: user.otpEnabled,
+        },
+      });
+    }
+
+    // Credentials are correct — send OTP to email
+    try {
+      await sendOtp(normalizedEmail, "login");
+    } catch (otpError) {
+      if (otpError.code === "RATE_LIMITED") {
+        // OTP already sent recently — tell frontend to show OTP screen with existing OTP
+        return res.status(200).json({
+          success: true,
+          message:
+            "An OTP was already sent to your email. Please check your inbox.",
+          requiresOtp: true,
+          email: normalizedEmail,
+          alreadySent: true,
+        });
+      }
+      throw otpError;
+    }
+
+    // ✅ Return OTP-required response (frontend will show OTP screen)
+    return res.status(200).json({
       success: true,
+      message: "OTP sent to your email. Please verify to complete login.",
+      requiresOtp: true,
+      email: normalizedEmail,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error during login",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * FUNCTION: Verify OTP and complete login (Step 2 of 2)
+ * Purpose: Verify the OTP, then return user data to log them in
+ * Route: POST /api/users/verify-login-otp
+ */
+exports.verifyLoginOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required",
+    });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const result = await verifyOtp(normalizedEmail, otp, "login");
+
+    if (!result.valid) {
+      return res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    // OTP verified — fetch user and return their data
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "-password",
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful!",
       data: {
         _id: user._id,
         name: user.name,
@@ -211,7 +360,125 @@ exports.loginUser = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Error during login",
+      message: "Error verifying OTP",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * FUNCTION: Resend OTP
+ * Purpose: Allow user to request a new OTP if they didn't receive one
+ * Route: POST /api/users/resend-otp
+ */
+exports.resendOtp = async (req, res) => {
+  const { email, purpose } = req.body;
+
+  if (!email || !purpose) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and purpose are required",
+    });
+  }
+
+  if (!["register", "login"].includes(purpose)) {
+    return res.status(400).json({
+      success: false,
+      message: "Purpose must be 'register' or 'login'",
+    });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const Otp = require("../models/Otp.model");
+    const existingOtp = await Otp.findOne({ email: normalizedEmail, purpose });
+    const tempData = existingOtp?.tempData || null;
+
+    if (purpose === "register" && !tempData) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration session expired. Please fill the form again.",
+      });
+    }
+
+    if (purpose === "login") {
+      const user = await User.findOne({ email: normalizedEmail });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "No account found with this email",
+        });
+      }
+    }
+
+    await sendOtp(normalizedEmail, purpose, tempData);
+
+    return res.status(200).json({
+      success: true,
+      message: "A new OTP has been sent to your email.",
+    });
+  } catch (error) {
+    if (error.code === "RATE_LIMITED") {
+      return res.status(429).json({
+        success: false,
+        message: error.message,
+        secondsLeft: error.secondsLeft,
+        isRateLimited: true,
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "Error resending OTP",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * FUNCTION: Update OTP preference for login
+ * Purpose: User can enable/disable OTP verification on every login
+ * Route: PUT /api/users/:id/otp-preference
+ */
+exports.updateOtpPreference = async (req, res) => {
+  const { id } = req.params;
+  const { otpEnabled } = req.body;
+
+  if (typeof otpEnabled !== "boolean") {
+    return res.status(400).json({
+      success: false,
+      message: "otpEnabled must be true or false",
+    });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(
+      id,
+      { otpEnabled },
+      { new: true },
+    ).select("-password");
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `OTP login verification ${otpEnabled ? "enabled" : "disabled"} successfully`,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        otpEnabled: user.otpEnabled,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating OTP preference",
       error: error.message,
     });
   }

@@ -55,6 +55,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // FIELD: Whether to require OTP verification on every login
+    // User can disable this in Settings for convenience (at slight security cost)
+    // Registration OTP is always mandatory regardless of this setting
+    otpEnabled: {
+      type: Boolean,
+      default: true,
+    },
   },
   // Add automatic timestamps
   // createdAt: When user was created
