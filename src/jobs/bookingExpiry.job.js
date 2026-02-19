@@ -24,7 +24,9 @@ async function expireBookings() {
   });
 
   if (existingJob) {
-    console.log("[BOOKING EXPIRY JOB] Another instance is already running, skipping...");
+    console.log(
+      "[BOOKING EXPIRY JOB] Another instance is already running, skipping...",
+    );
     return;
   }
 
@@ -57,11 +59,15 @@ async function expireBookings() {
     if (expiredBookings.length === 0) {
       await session.commitTransaction();
       session.endSession();
-      
+
       // Mark job as completed
       jobExecution.status = "COMPLETED";
       jobExecution.completedAt = new Date();
-      jobExecution.results = { processed: 0, errors: 0, details: "No expired bookings found" };
+      jobExecution.results = {
+        processed: 0,
+        errors: 0,
+        details: "No expired bookings found",
+      };
       await jobExecution.save();
       return;
     }
@@ -70,13 +76,15 @@ async function expireBookings() {
       try {
         // 4️⃣ Mark booking as EXPIRED with potential refund
         booking.status = BOOKING_STATUS.EXPIRED;
-        
+
         // If booking has amount, assume payment might have been charged
         if (booking.amount && booking.amount > 0) {
           booking.refundAmount = booking.amount; // Issue refund for timeout
-          console.log(`[BOOKING EXPIRY JOB] Issuing refund of ${booking.amount} for timed-out booking ${booking._id}`);
+          console.log(
+            `[BOOKING EXPIRY JOB] Issuing refund of ${booking.amount} for timed-out booking ${booking._id}`,
+          );
         }
-        
+
         await booking.save({ session });
 
         // 5️⃣ Release associated lock if exists
@@ -106,7 +114,10 @@ async function expireBookings() {
         processed++;
       } catch (error) {
         errors++;
-        console.error(`[BOOKING EXPIRY JOB] Error processing booking ${booking._id}:`, error.message);
+        console.error(
+          `[BOOKING EXPIRY JOB] Error processing booking ${booking._id}:`,
+          error.message,
+        );
       }
     }
 
@@ -116,10 +127,10 @@ async function expireBookings() {
     // Mark job as completed
     jobExecution.status = "COMPLETED";
     jobExecution.completedAt = new Date();
-    jobExecution.results = { 
-      processed, 
-      errors, 
-      details: `Processed ${processed} bookings, ${errors} errors` 
+    jobExecution.results = {
+      processed,
+      errors,
+      details: `Processed ${processed} bookings, ${errors} errors`,
     };
     await jobExecution.save();
 
@@ -129,22 +140,24 @@ async function expireBookings() {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    
+
     // Mark job as failed
     jobExecution.status = "FAILED";
     jobExecution.completedAt = new Date();
-    jobExecution.results = { 
-      processed: 0, 
-      errors: 1, 
-      details: error.message 
+    jobExecution.results = {
+      processed: 0,
+      errors: 1,
+      details: error.message,
     };
     await jobExecution.save();
-    
+
     console.error("[BOOKING EXPIRY JOB ERROR]", error.message);
   }
 }
 
-// Run every minute
-setInterval(expireBookings, BOOKING_EXPIRY_INTERVAL_MINUTES * 60 * 1000);
+// Only run interval in non-serverless (traditional server) environment
+if (process.env.VERCEL !== "1") {
+  setInterval(expireBookings, BOOKING_EXPIRY_INTERVAL_MINUTES * 60 * 1000);
+}
 
 module.exports = { expireBookings };

@@ -22,7 +22,9 @@ async function expireLocks() {
   });
 
   if (existingJob) {
-    console.log("[LOCK EXPIRY JOB] Another instance is already running, skipping...");
+    console.log(
+      "[LOCK EXPIRY JOB] Another instance is already running, skipping...",
+    );
     return;
   }
 
@@ -53,11 +55,15 @@ async function expireLocks() {
     if (expiredLocks.length === 0) {
       await session.commitTransaction();
       session.endSession();
-      
+
       // Mark job as completed
       jobExecution.status = "COMPLETED";
       jobExecution.completedAt = new Date();
-      jobExecution.results = { processed: 0, errors: 0, details: "No expired locks found" };
+      jobExecution.results = {
+        processed: 0,
+        errors: 0,
+        details: "No expired locks found",
+      };
       await jobExecution.save();
       return;
     }
@@ -81,7 +87,10 @@ async function expireLocks() {
         );
       } catch (error) {
         errors++;
-        console.error(`[LOCK EXPIRY JOB] Error processing lock ${lock._id}:`, error.message);
+        console.error(
+          `[LOCK EXPIRY JOB] Error processing lock ${lock._id}:`,
+          error.message,
+        );
       }
     }
 
@@ -91,10 +100,10 @@ async function expireLocks() {
     // Mark job as completed
     jobExecution.status = "COMPLETED";
     jobExecution.completedAt = new Date();
-    jobExecution.results = { 
-      processed, 
-      errors, 
-      details: `Processed ${processed} locks, ${errors} errors` 
+    jobExecution.results = {
+      processed,
+      errors,
+      details: `Processed ${processed} locks, ${errors} errors`,
     };
     await jobExecution.save();
 
@@ -104,22 +113,24 @@ async function expireLocks() {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    
+
     // Mark job as failed
     jobExecution.status = "FAILED";
     jobExecution.completedAt = new Date();
-    jobExecution.results = { 
-      processed: 0, 
-      errors: 1, 
-      details: error.message 
+    jobExecution.results = {
+      processed: 0,
+      errors: 1,
+      details: error.message,
     };
     await jobExecution.save();
-    
+
     console.error("[LOCK EXPIRY JOB ERROR]", error.message);
   }
 }
 
-// Run every minute
-setInterval(expireLocks, LOCK_EXPIRY_INTERVAL_MINUTES * 60 * 1000);
+// Only run interval in non-serverless (traditional server) environment
+if (process.env.VERCEL !== "1") {
+  setInterval(expireLocks, LOCK_EXPIRY_INTERVAL_MINUTES * 60 * 1000);
+}
 
 module.exports = expireLocks;

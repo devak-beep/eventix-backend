@@ -127,7 +127,9 @@ async function deleteExpiredEvents() {
   }
 }
 
-// Run every hour
-setInterval(deleteExpiredEvents, EVENT_EXPIRY_INTERVAL_MINUTES * 60 * 1000);
+// Only run interval in non-serverless (traditional server) environment
+if (process.env.VERCEL !== "1") {
+  setInterval(deleteExpiredEvents, EVENT_EXPIRY_INTERVAL_MINUTES * 60 * 1000);
+}
 
 module.exports = deleteExpiredEvents;
