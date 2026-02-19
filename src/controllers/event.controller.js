@@ -156,7 +156,7 @@ exports.getMyEvents = async (req, res) => {
 
   const events = await Event.find({ createdBy: userId })
     .select(
-      "name description eventDate totalSeats availableSeats type category amount currency creationCharge createdAt",
+      "name description eventDate totalSeats availableSeats type category amount currency creationCharge createdAt image",
     )
     .sort({ createdAt: -1 }); // Sort by creation date (newest first)
 
@@ -165,6 +165,78 @@ exports.getMyEvents = async (req, res) => {
     data: events,
     count: events.length,
   });
+};
+
+/**
+ * Update event image (SuperAdmin can update any, Admin can only update their own)
+ */
+exports.updateEventImage = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { userId, userRole, image } = req.body;
+
+    if (!userId || !userRole) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and userRole are required",
+      });
+    }
+
+    if (!image) {
+      return res.status(400).json({
+        success: false,
+        message: "image is required",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID",
+      });
+    }
+
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    // Authorization check
+    const isCreator = event.createdBy && event.createdBy.toString() === userId;
+    const isSuperAdmin = userRole === "superAdmin";
+
+    if (!isSuperAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only update images for events you created",
+      });
+    }
+
+    // Update the image (old image is automatically replaced - it's stored inline as base64)
+    event.image = image;
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Event image updated successfully",
+      data: {
+        _id: event._id,
+        name: event.name,
+        image: event.image,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating event image:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update event image",
+      error: error.message,
+    });
+  }
 };
 
 /**

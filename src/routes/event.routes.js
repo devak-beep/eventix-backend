@@ -14,6 +14,7 @@ const {
   getAllPublicEvents, // Fetches all public events
   getMyEvents, // Fetches user's created events
   lockSeats, // Locks seats for an event
+  updateEventImage, // Updates event image
 } = require("../controllers/event.controller");
 
 // Import auth middleware
@@ -53,6 +54,14 @@ router.get("/:id", getEventById);
 // Request body: {seats, idempotencyKey}
 // Response: {success: true, lockId, expiresAt}
 router.post("/:eventId/lock", lockSeats);
+
+// ROUTE 4: PATCH /api/events/:eventId/image
+// Purpose: Update event image (SuperAdmin can update any, Admin only their own)
+// Handler: updateEventImage function
+// URL parameter: eventId
+// Request body: {userId, userRole, image}
+// Response: {success: true, message, data}
+router.patch("/:eventId/image", requireAdmin, updateEventImage);
 
 // Export router so app.js can use it
 module.exports = router;

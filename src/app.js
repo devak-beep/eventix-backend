@@ -50,7 +50,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Correlation-ID"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Correlation-ID", "x-user-id", "x-user-role"],
   }),
 );
 
