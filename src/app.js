@@ -69,6 +69,22 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
 
+// DEBUG: Database connection status
+app.get("/debug/db", (req, res) => {
+  const mongoose = require("mongoose");
+  res.json({
+    readyState: mongoose.connection.readyState,
+    states: {
+      0: "disconnected",
+      1: "connected",
+      2: "connecting",
+      3: "disconnecting"
+    },
+    currentState: ["disconnected", "connected", "connecting", "disconnecting"][mongoose.connection.readyState],
+    mongoUri: process.env.MONGO_URI ? "exists" : "missing"
+  });
+});
+
 // ERROR HANDLING MIDDLEWARE (must be last)
 app.use(errorMiddleware);
 
