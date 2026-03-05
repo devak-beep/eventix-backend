@@ -120,6 +120,17 @@ exports.getUserById = async (req, res) => {
  * Route: POST /api/users/login
  */
 exports.loginUser = async (req, res) => {
+  const mongoose = require("mongoose");
+
+  // Check database connection
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: "Database not ready",
+      error: `readyState=${mongoose.connection.readyState}`,
+    });
+  }
+
   // Extract credentials from request body
   const { email, password } = req.body;
 

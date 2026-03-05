@@ -1,115 +1,47 @@
-// ============================================
-// EXPRESS APP CONFIGURATION
-// Sets up Express server with routes and middleware
-// ============================================
-
-// Import Express framework
 const express = require("express");
-// Import CORS to allow frontend to talk to backend
 const cors = require("cors");
-// Import mongoose to check connection
 const mongoose = require("mongoose");
-// Import middleware for automatic error handling in async functions
-// Without this, errors in async functions would crash the server
 require("express-async-errors");
 
-// Import middleware
 const correlationMiddleware = require("./middlewares/correlation.middleware");
 const errorMiddleware = require("./middlewares/error.middleware");
 
-// Import all route files
-const userRoutes = require("./routes/user.routes"); // User registration/retrieval routes
-const eventRoutes = require("./routes/event.routes"); // Event creation/retrieval routes
-const lockRoutes = require("./routes/lock.routes"); // Seat locking routes
-const bookingRoutes = require("./routes/booking.routes"); // Booking confirmation routes
+const userRoutes = require("./routes/user.routes");
+const eventRoutes = require("./routes/event.routes");
+const lockRoutes = require("./routes/lock.routes");
+const bookingRoutes = require("./routes/booking.routes");
 
-// Create Express app instance
 const app = express();
 
-// MIDDLEWARE: Enable CORS (allows frontend to talk to backend)
 app.use(cors());
-
-// MIDDLEWARE: Correlation ID for request tracking
 app.use(correlationMiddleware);
-
-// MIDDLEWARE: Enable JSON parsing
-// This allows the server to read JSON from request bodies
-// Example: POST /api/users/register with {"name": "John"}
 app.use(express.json());
 
-// DEBUG: Database connection status (before connection check middleware)
-app.get("/debug/db", (req, res) => {
-  const mongoose = require("mongoose");
-  res.json({
-    readyState: mongoose.connection.readyState,
-    states: {
-      0: "disconnected",
-      1: "connected",
-      2: "connecting",
-      3: "disconnecting"
-    },
-    currentState: ["disconnected", "connected", "connecting", "disconnecting"][mongoose.connection.readyState],
-    mongoUri: process.env.MONGO_URI ? "exists" : "missing"
-  });
-});
-
-// DEBUG: Force connection test
-app.get("/debug/connect", async (req, res) => {
-  const mongoose = require("mongoose");
-  try {
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
-      });
-    }
-    res.json({
-      success: true,
-      state: mongoose.connection.readyState,
-      message: "Connected successfully"
-    });
-  } catch (error) {
-    res.json({
-      success: false,
-      error: error.message,
-      stack: error.stack
-    });
-  }
-});
-
-// MIDDLEWARE: Check database connection before processing requests
-app.use((req, res, next) => {
-  // Skip check for debug endpoints
-  if (req.path.startsWith('/debug/')) {
-    return next();
-  }
-  
-  // Remove the connection check - let mongoose handle it with bufferCommands: false
-  next();
-});
-
-// REGISTER ROUTES: Mount route handlers at different API endpoints
-// Example: POST /api/users/register → handled by userRoutes
-app.use("/api/users", userRoutes); // Routes: POST /register, GET /:id
-app.use("/api/events", eventRoutes); // Routes: POST /, GET /:id, POST /:eventId/lock
-app.use("/api/locks", lockRoutes); // Route: POST /
-app.use("/api/bookings", bookingRoutes); // Routes: POST /confirm, POST /:id/confirm
-app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /intent
-app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
-app.use("/api/audit", require("./routes/audit.routes")); // Routes: GET /, GET /:bookingId
-app.use("/api/reports", require("./routes/reports.routes")); // Routes: GET /booking-summary, GET /health-metrics
-app.use("/api/cancellations", require("./routes/cancellation.routes")); // Route: POST /:bookingId/cancel
-
-// HEALTH CHECK ENDPOINT
-// GET /health → {"status": "OK"}
-// Used to check if server is running without any errors
-// DevOps tools use this to monitor server health
+// Health check
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
 
-// ERROR HANDLING MIDDLEWARE (must be last)
+// Debug endpoint
+app.get("/health/db", (req, res) => {
+  res.json({
+    success: true,
+    readyState: mongoose.connection.readyState,
+  });
+});
+
+// Routes
+app.use("/api/users", userRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/locks", lockRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/payments", require("./routes/payment.routes"));
+app.use("/api/jobs", require("./routes/job.routes"));
+app.use("/api/audit", require("./routes/audit.routes"));
+app.use("/api/reports", require("./routes/reports.routes"));
+app.use("/api/cancellations", require("./routes/cancellation.routes"));
+
+// Error handling
 app.use(errorMiddleware);
 
-// Export app so server.js can use it
 module.exports = app;
