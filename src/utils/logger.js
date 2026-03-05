@@ -1,6 +1,14 @@
 const winston = require('winston');
 require('winston-mongodb');
-const Audit = require('../models/Audit.model');
+
+// Lazy-load Audit model to avoid loading before DB connection
+let Audit = null;
+const getAuditModel = () => {
+  if (!Audit) {
+    Audit = require('../models/Audit.model');
+  }
+  return Audit;
+};
 
 // Detect serverless environment
 const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME);
@@ -55,7 +63,8 @@ async function logBookingStateChange(bookingId, fromState, toState, userId, corr
 
   // 2. Store in MongoDB
   try {
-    await Audit.create({
+    const AuditModel = getAuditModel();
+    await AuditModel.create({
       bookingId,
       eventId: eventId || metadata.eventId,
       fromStatus: fromState,
