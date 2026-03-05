@@ -55,6 +55,11 @@ app.get("/debug/db", (req, res) => {
 
 // MIDDLEWARE: Check database connection before processing requests
 app.use((req, res, next) => {
+  // Skip check for debug endpoint
+  if (req.path === '/debug/db') {
+    return next();
+  }
+  
   if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({
       success: false,
