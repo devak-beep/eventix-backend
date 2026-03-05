@@ -19,15 +19,26 @@ const connectDB = async () => {
     return;
   }
 
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+  // If connecting, wait for it
+  if (mongoose.connection.readyState === 2) {
+    console.log("MongoDB connection in progress, waiting...");
+    await new Promise((resolve) => {
+      mongoose.connection.once('connected', resolve);
     });
-    console.log("MongoDB connected");
+    return;
+  }
+
+  try {
+    console.log("Connecting to MongoDB...");
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      bufferCommands: false, // Disable buffering
+    });
+    console.log("MongoDB connected successfully");
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);
-    throw error; // Don't exit in serverless
+    throw error;
   }
 };
 
