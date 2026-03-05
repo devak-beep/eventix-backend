@@ -6,7 +6,12 @@ const jobExecutionSchema = new mongoose.Schema(
     // Type of job
     jobType: {
       type: String,
-      enum: ["EXPIRE_LOCKS", "EXPIRE_BOOKINGS", "FAILURE_RECOVERY"],
+      enum: [
+        "EXPIRE_LOCKS",
+        "EXPIRE_BOOKINGS",
+        "FAILURE_RECOVERY",
+        "DELETE_EXPIRED_EVENTS",
+      ],
       required: true,
     },
 
@@ -32,6 +37,7 @@ const jobExecutionSchema = new mongoose.Schema(
     // Job results
     results: {
       processed: { type: Number, default: 0 },
+      eventsDeleted: { type: Number, default: 0 },
       errors: { type: Number, default: 0 },
       details: { type: String, required: false },
     },
@@ -43,7 +49,7 @@ const jobExecutionSchema = new mongoose.Schema(
       expires: 3600, // 1 hour in seconds
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Compound index for job type and status

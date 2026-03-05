@@ -79,6 +79,24 @@ const bookingSchema = new mongoose.Schema(
       default: 0,
       min: 0, // Cannot be negative
     },
+
+    // FIELD: Stripe checkout session ID
+    stripeSessionId: {
+      type: String,
+      required: false,
+    },
+
+    // FIELD: Razorpay order ID
+    razorpayOrderId: {
+      type: String,
+      required: false,
+    },
+
+    // FIELD: Razorpay payment ID
+    razorpayPaymentId: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }, // Add createdAt and updatedAt fields
 );

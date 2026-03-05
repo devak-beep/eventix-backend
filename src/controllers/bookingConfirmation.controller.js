@@ -15,8 +15,10 @@ exports.getAllBookings = async (req, res) => {
     }
 
     const bookings = await Booking.find(filter)
-      .populate("user", "name email")
-      .populate("event", "name totalSeats availableSeats");
+      .populate("user", "name email _id")
+      .populate("event", "name totalSeats availableSeats image amount _id createdBy approvedBy")
+      .populate("seatLockId", "status seats expiresAt")
+      .sort({ createdAt: -1 }); // Sort by most recent first
 
     res.status(200).json({
       success: true,
@@ -48,7 +50,7 @@ exports.getBookingById = async (req, res) => {
 
     const booking = await Booking.findById(id)
       .populate("user", "name email")
-      .populate("event", "name totalSeats availableSeats");
+      .populate("event", "name totalSeats availableSeats image");
 
     if (!booking) {
       return res.status(404).json({
@@ -82,7 +84,10 @@ exports.confirmBooking = async (req, res) => {
       });
     }
 
-    const booking = await confirmBookingTransactional(lockId, req.correlationId);
+    const booking = await confirmBookingTransactional(
+      lockId,
+      req.correlationId,
+    );
 
     res.status(201).json({
       success: true,

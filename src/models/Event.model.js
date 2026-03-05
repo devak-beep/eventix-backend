@@ -62,18 +62,21 @@ const eventSchema = new mongoose.Schema(
     },
 
     // FIELD: Event category
-    category: {
-      type: String,
-      enum: [
-        "food-drink",
-        "sports-live",
-        "arts-theater",
-        "comedy-standup",
-        "movies-premieres",
-        "concerts-music",
-      ],
-      required: true,
-    },
+    category: [
+      {
+        type: String,
+        enum: [
+          "food-drink",
+          "festivals-cultural",
+          "dance-party",
+          "sports-live",
+          "arts-theater",
+          "comedy-standup",
+          "movies-premieres",
+          "concerts-music",
+        ],
+      },
+    ],
 
     // FIELD: Ticket price per seat (in smallest currency unit, e.g., cents/paise)
     // Store as integer to avoid floating point issues
@@ -99,10 +102,34 @@ const eventSchema = new mongoose.Schema(
       min: 0,
     },
 
-    // FIELD: User who created this event
+    // FIELD: User who created this event (the requester)
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+    },
+
+    // FIELD: Admin/SuperAdmin who approved this event request
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    // FIELD: Whether this event was created via request flow
+    createdViaRequest: {
+      type: Boolean,
+      default: false,
+    },
+
+    // FIELD: Reference to the original event request
+    eventRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EventRequest",
+    },
+
+    // FIELD: Event image (base64 encoded or URL)
+    image: {
+      type: String,
+      default: null,
     },
 
     // FIELD: Idempotency key for duplicate prevention
@@ -110,6 +137,35 @@ const eventSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true, // Allow multiple nulls
+    },
+
+    // FIELD: Payment status for event creation
+    paymentStatus: {
+      type: String,
+      enum: ["PENDING", "PAID", "FAILED"],
+      default: "PENDING",
+    },
+
+    // FIELD: Razorpay order ID for event creation
+    razorpayOrderId: {
+      type: String,
+    },
+
+    // FIELD: Razorpay payment ID for event creation
+    razorpayPaymentId: {
+      type: String,
+    },
+
+    // FIELD: Event creation fee paid
+    creationFee: {
+      type: Number,
+      default: 0,
+    },
+
+    // FIELD: Whether event is published (after payment)
+    isPublished: {
+      type: Boolean,
+      default: false,
     },
   },
   // Add automatic timestamps

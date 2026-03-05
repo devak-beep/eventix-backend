@@ -35,7 +35,8 @@ exports.getAllLocks = async (req, res) => {
 exports.lockSeats = async (req, res) => {
   console.log("REQ BODY 👉", req.body);
 
-  const { eventId, userId, seats, idempotencyKey } = req.body;
+  const { eventId } = req.params;
+  const { userId, seats, idempotencyKey } = req.body;
 
   if (!eventId || !userId || !seats || !idempotencyKey) {
     return res.status(400).json({
@@ -46,7 +47,12 @@ exports.lockSeats = async (req, res) => {
 
   const existingLock = await SeatLock.findOne({ idempotencyKey });
   if (existingLock) {
-    return res.status(200).json({ success: true, data: existingLock });
+    return res.status(200).json({ 
+      success: true, 
+      lockId: existingLock._id,
+      expiresAt: existingLock.expiresAt,
+      data: existingLock 
+    });
   }
 
   const session = await mongoose.startSession();
@@ -80,7 +86,12 @@ exports.lockSeats = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({ success: true, data: lock[0] });
+    res.status(201).json({ 
+      success: true, 
+      lockId: lock[0]._id,
+      expiresAt: lock[0].expiresAt,
+      data: lock[0]
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -103,19 +114,46 @@ exports.cancelLock = async (req, res) => {
     const lock = await SeatLock.findById(lockId).session(session);
 
     if (!lock) {
-      throw new Error("Lock not found");
+      await session.abortTransaction();
+      session.endSession();
+      // Return success for idempotency - lock doesn't exist, nothing to cancel
+      return res.status(200).json({
+        success: true,
+        message: "Lock not found (already processed)",
+        alreadyProcessed: true,
+      });
     }
 
+    // BUGFIX: If lock is not ACTIVE, return success (idempotent)
+    // This prevents double seat restoration
     if (lock.status !== "ACTIVE") {
-      throw new Error("Lock is not active");
+      await session.abortTransaction();
+      session.endSession();
+      console.log(
+        `[CANCEL LOCK] Lock ${lockId} is ${lock.status}, skipping (idempotent)`,
+      );
+      return res.status(200).json({
+        success: true,
+        message: `Lock already ${lock.status} (idempotent)`,
+        alreadyProcessed: true,
+        lockStatus: lock.status,
+      });
     }
 
-    // Restore seats
-    await Event.findByIdAndUpdate(
-      lock.eventId,
-      { $inc: { availableSeats: lock.seats } },
-      { session }
-    );
+    // Restore seats atomically with constraint check
+    const event = await Event.findById(lock.eventId).session(session);
+    if (event) {
+      // Use constraint to prevent availableSeats > totalSeats
+      const newAvailableSeats = Math.min(
+        event.availableSeats + lock.seats,
+        event.totalSeats,
+      );
+      event.availableSeats = newAvailableSeats;
+      await event.save({ session });
+      console.log(
+        `[CANCEL LOCK] Restored ${lock.seats} seats for event ${lock.eventId}. New available: ${newAvailableSeats}`,
+      );
+    }
 
     // Mark lock as cancelled
     lock.status = "CANCELLED";
@@ -128,6 +166,7 @@ exports.cancelLock = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
+    console.error("[CANCEL LOCK] Error:", error.message);
 
     res.status(400).json({
       success: false,

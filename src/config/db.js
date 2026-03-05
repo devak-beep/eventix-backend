@@ -1,34 +1,48 @@
-const mongoose = require('mongoose');
+// ============================================
+// DATABASE CONNECTION SETUP
+// Connects the app to MongoDB database
+// ============================================
 
-mongoose.set('bufferCommands', false);
+const mongoose = require("mongoose");
 
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) throw new Error('MONGO_URI is missing');
+// Increase mongoose buffering timeout to 30 seconds
+mongoose.set("bufferTimeoutMS", 30000);
 
-let cached = global.__mongooseCache;
-if (!cached) cached = global.__mongooseCache = { conn: null, promise: null };
+// Track connection state
+let connectionPromise = null;
 
-async function connectDB() {
-  if (cached.conn) return cached.conn;
-  if (!cached.promise) {
-    console.log('[DB] Connecting to MongoDB...');
-    cached.promise = mongoose.connect(MONGO_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 20000,
-      maxPoolSize: 1,
-      retryWrites: true,
-      w: 'majority'
-    }).then((conn) => {
-      console.log('[DB] Connected successfully');
-      return conn;
-    }).catch((err) => {
-      console.error('[DB] Connection failed:', err.message);
-      cached.promise = null;
-      throw err;
-    });
+const connectDB = async () => {
+  // If already connected, return immediately
+  if (mongoose.connection.readyState === 1) {
+    return;
   }
-  cached.conn = await cached.promise;
-  return cached.conn;
-}
+
+  // If connection is in progress, wait for it
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
+  console.log("[DB] Connecting to MongoDB...");
+  console.log("[DB] URI exists:", !!process.env.MONGO_URI);
+
+  connectionPromise = mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 30000,
+  });
+
+  try {
+    await connectionPromise;
+    console.log(
+      "[DB] MongoDB connected successfully, state:",
+      mongoose.connection.readyState,
+    );
+    return;
+  } catch (error) {
+    connectionPromise = null;
+    console.error("[DB] MongoDB connection failed:", error.message);
+    throw error;
+  }
+};
 
 module.exports = connectDB;

@@ -59,19 +59,22 @@ async function recoverFromFailures() {
       );
 
       for (const lock of staleActiveLocks) {
-        // Mark as expired and restore seats
+        // Mark as expired and restore seats with constraint check
         lock.status = "EXPIRED";
         await lock.save({ session });
 
-        await Event.findByIdAndUpdate(
-          lock.eventId,
-          { $inc: { availableSeats: lock.seats } },
-          { session, new: true },
-        );
-
-        console.log(
-          `[RECOVERY] ✅ Expired stale lock ${lock._id}, restored ${lock.seats} seats`,
-        );
+        const event = await Event.findById(lock.eventId).session(session);
+        if (event) {
+          const newAvailableSeats = Math.min(
+            event.availableSeats + lock.seats,
+            event.totalSeats,
+          );
+          event.availableSeats = newAvailableSeats;
+          await event.save({ session });
+          console.log(
+            `[RECOVERY] ✅ Expired stale lock ${lock._id}. New available: ${newAvailableSeats}/${event.totalSeats}`,
+          );
+        }
       }
     }
 
@@ -103,11 +106,15 @@ async function recoverFromFailures() {
             lock.status = "EXPIRED";
             await lock.save({ session });
 
-            await Event.findByIdAndUpdate(
-              lock.eventId,
-              { $inc: { availableSeats: lock.seats } },
-              { session, new: true },
-            );
+            const event = await Event.findById(lock.eventId).session(session);
+            if (event) {
+              const newAvailableSeats = Math.min(
+                event.availableSeats + lock.seats,
+                event.totalSeats,
+              );
+              event.availableSeats = newAvailableSeats;
+              await event.save({ session });
+            }
 
             console.log(
               `[RECOVERY] ✅ Expired stale booking ${booking._id}, released lock ${lock._id}`,

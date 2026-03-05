@@ -1,89 +1,128 @@
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const rateLimit = require('express-rate-limit');
-const connectDB = require('./config/db');
-require('express-async-errors');
+// ============================================
+// EXPRESS APP CONFIGURATION
+// Sets up Express server with routes and middleware
+// ============================================
 
-const correlationMiddleware = require('./middlewares/correlation.middleware');
-const errorMiddleware = require('./middlewares/error.middleware');
+// Import Express framework
+const express = require("express");
+// Import CORS to allow frontend to talk to backend
+const cors = require("cors");
+// Import mongoose to check DB state
+const mongoose = require("mongoose");
+// Import middleware for automatic error handling in async functions
+// Without this, errors in async functions would crash the server
+require("express-async-errors");
 
+// Import middleware
+const correlationMiddleware = require("./middlewares/correlation.middleware");
+const errorMiddleware = require("./middlewares/error.middleware");
+const connectDB = require("./config/db");
+
+// Import all route files
+const userRoutes = require("./routes/user.routes"); // User registration/retrieval routes
+const eventRoutes = require("./routes/event.routes"); // Event creation/retrieval routes
+const lockRoutes = require("./routes/lock.routes"); // Seat locking routes
+const bookingRoutes = require("./routes/booking.routes"); // Booking confirmation routes
+
+// Create Express app instance
 const app = express();
 
-// CORS - restrict to frontend only
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://eventix-frontend-8v2j.vercel.app',
-  credentials: true
-}));
+// MIDDLEWARE: Enable CORS (allows frontend to talk to backend)
+// Regex covers ALL vercel.app preview + production deployments for this project
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
 
+      const allowed = [
+        /^http:\/\/localhost:\d+$/, // any localhost port
+        /^https:\/\/eventix-frontend[^.]*\.vercel\.app$/, // all eventix-frontend-*.vercel.app
+        /^https:\/\/eventix[^.]*\.vercel\.app$/, // any eventix*.vercel.app variant
+        "https://eventix-frontend-8v2j.vercel.app", // explicit production frontend
+      ];
+
+      const isAllowed = allowed.some((pattern) =>
+        typeof pattern === "string" ? pattern === origin : pattern.test(origin),
+      );
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log(`CORS blocked origin: ${origin}`);
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Correlation-ID",
+      "x-user-id",
+      "x-user-role",
+    ],
+  }),
+);
+
+// Handle preflight OPTIONS requests for all routes
+app.options("*", cors());
+
+// MIDDLEWARE: Correlation ID for request tracking
 app.use(correlationMiddleware);
-app.use(express.json({ limit: '10mb' })); // Payload size limit
 
-// Rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
-  message: { success: false, message: 'Too many login attempts, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// MIDDLEWARE: Enable JSON parsing
+// This allows the server to read JSON from request bodies
+// Example: POST /api/users/register with {"name": "John"}
+// Increase limit to handle base64 images (10MB)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Hard guarantee: every request waits for DB
+// MIDDLEWARE: Ensure database is connected before processing requests
 app.use(async (req, res, next) => {
+  // Skip DB check for health endpoint
+  if (req.path === "/health") {
+    return next();
+  }
+
   try {
-    if (mongoose.connection.readyState !== 1) {
-      await connectDB();
-    }
+    // Always ensure DB is connected - connectDB handles state checking internally
+    await connectDB();
     next();
-  } catch (err) {
-    return res.status(503).json({
+  } catch (error) {
+    console.error("[APP] DB connection error:", error.message);
+    res.status(500).json({
       success: false,
-      message: 'Database not ready',
-      error: err.message,
+      error: "Database connection failed",
+      details: error.message,
     });
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK' });
+// REGISTER ROUTES: Mount route handlers at different API endpoints
+// Example: POST /api/users/register → handled by userRoutes
+app.use("/api/users", userRoutes); // Routes: POST /register, GET /:id
+app.use("/api/events", eventRoutes); // Routes: POST /, GET /:id, POST /:eventId/lock
+app.use("/api/locks", lockRoutes); // Route: POST /
+app.use("/api/bookings", bookingRoutes); // Routes: POST /confirm, POST /:id/confirm
+app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /intent
+app.use("/api/stripe", require("./routes/stripe.routes")); // Stripe payment routes
+app.use("/api/razorpay", require("./routes/razorpay.routes")); // Razorpay payment routes
+app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
+app.use("/api/audit", require("./routes/audit.routes")); // Routes: GET /, GET /:bookingId
+app.use("/api/reports", require("./routes/reports.routes")); // Routes: GET /booking-summary, GET /health-metrics
+app.use("/api/cancellations", require("./routes/cancellation.routes")); // Route: POST /:bookingId/cancel
+app.use("/api/event-requests", require("./routes/eventRequest.routes")); // Event creation request workflow
+
+// HEALTH CHECK ENDPOINT
+// GET /health → {"status": "OK"}
+// Used to check if server is running without any errors
+// DevOps tools use this to monitor server health
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK" });
 });
 
-// Internal health check only - remove in production or add auth
-app.get('/health/db', (req, res) => {
-  // TODO: Add authentication or remove this endpoint
-  res.json({ 
-    success: true, 
-    readyState: mongoose.connection.readyState,
-    env: process.env.NODE_ENV 
-  });
-});
-
-// Routes
-app.use('/api/users', authLimiter, require('./routes/user.routes')); // Rate limit auth
-app.use('/api/events', require('./routes/event.routes'));
-app.use('/api/locks', require('./routes/lock.routes'));
-app.use('/api/bookings', require('./routes/booking.routes'));
-app.use('/api/payments', require('./routes/payment.routes'));
-app.use('/api/jobs', require('./routes/job.routes'));
-app.use('/api/audit', require('./routes/audit.routes'));
-app.use('/api/reports', require('./routes/reports.routes'));
-app.use('/api/cancellations', require('./routes/cancellation.routes'));
-
-// Error handling - sanitize errors in production
-app.use((err, req, res, next) => {
-  const correlationId = req.correlationId || 'unknown';
-  console.error(`[${correlationId}] Error:`, err.message);
-  
-  const isDev = process.env.NODE_ENV !== 'production';
-  
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-    correlationId,
-    ...(isDev && { stack: err.stack }) // Only show stack in dev
-  });
-});
-
+// ERROR HANDLING MIDDLEWARE (must be last)
 app.use(errorMiddleware);
 
+// Export app so server.js can use it
 module.exports = app;

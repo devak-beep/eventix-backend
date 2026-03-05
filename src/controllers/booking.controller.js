@@ -42,6 +42,16 @@ exports.confirmBooking = async (req, res) => {
       });
     }
 
+    // 3a️⃣ Check if event has expired
+    const eventDate = new Date(event.eventDate);
+    const now = new Date();
+    if (eventDate <= now) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot confirm booking for expired event",
+      });
+    }
+
     // ⚠️ Seats are already handled in LOCK phase
     // Do NOT deduct seats again here
 

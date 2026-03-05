@@ -47,12 +47,19 @@ exports.processPayment = async (req, res) => {
     }
 
     // Record payment attempt
-    const seatCount = Array.isArray(booking.seats) ? booking.seats.length : (booking.seats || 1);
+    const seatCount = Array.isArray(booking.seats)
+      ? booking.seats.length
+      : booking.seats || 1;
     await PaymentAttempt.create({
       bookingId,
       idempotencyKey,
       forceResult: status.toLowerCase(), // Convert SUCCESS to success
-      status: status === "SUCCESS" ? "SUCCESS" : status === "FAILURE" ? "FAILED" : "TIMEOUT",
+      status:
+        status === "SUCCESS"
+          ? "SUCCESS"
+          : status === "FAILURE"
+            ? "FAILED"
+            : "TIMEOUT",
       amount: seatCount * 100, // Calculate from seats count
     });
 
@@ -61,14 +68,14 @@ exports.processPayment = async (req, res) => {
       booking.status = "CONFIRMED";
       booking.amount = seatCount * 100; // Save the amount to booking
       await booking.save();
-      
+
       // Mark the seat lock as CONSUMED to prevent seat restoration
       if (booking.seatLockId) {
         await SeatLock.findByIdAndUpdate(booking.seatLockId, {
-          status: "CONSUMED"
+          status: "CONSUMED",
         });
       }
-      
+
       return res.status(200).json({
         success: true,
         message: "Payment successful, booking confirmed",
@@ -78,12 +85,34 @@ exports.processPayment = async (req, res) => {
       if (booking.status === "PAYMENT_PENDING") {
         booking.status = "FAILED";
         await booking.save();
-        
-        // Restore seats
-        await Event.findByIdAndUpdate(booking.event, {
-          $inc: { availableSeats: booking.seats.length },
-        });
-        
+
+        // BUGFIX: Restore seats via lock (like paymentFailed does)
+        // This ensures lock status is updated to prevent double restoration
+        if (booking.seatLockId) {
+          const lock = await SeatLock.findById(booking.seatLockId);
+          if (lock && lock.status === "ACTIVE") {
+            // Use constraint check to prevent overselling
+            const event = await Event.findById(booking.event);
+            if (event) {
+              const newAvailableSeats = Math.min(
+                event.availableSeats + lock.seats,
+                event.totalSeats,
+              );
+              event.availableSeats = newAvailableSeats;
+              await event.save();
+            }
+            lock.status = "EXPIRED";
+            await lock.save();
+            console.log(
+              `[PAYMENT] Restored ${lock.seats} seats for lock ${lock._id}`,
+            );
+          } else if (lock) {
+            console.log(
+              `[PAYMENT] Lock ${lock._id} already ${lock.status}, skipping seat restoration`,
+            );
+          }
+        }
+
         return res.status(200).json({
           success: true,
           message: "Payment failed, seats restored",
@@ -119,7 +148,8 @@ exports.processPayment = async (req, res) => {
 // ========== TASK 5.1: Payment Intent API with Idempotency ==========
 exports.createPaymentIntent = async (req, res) => {
   const { bookingId, amount, force, idempotencyKey } = req.body;
-  const correlationId = req.headers["x-correlation-id"] || `payment-${Date.now()}`;
+  const correlationId =
+    req.headers["x-correlation-id"] || `payment-${Date.now()}`;
 
   // 1️⃣ Basic validation
   if (!bookingId || !amount || !force || !idempotencyKey) {
@@ -146,8 +176,10 @@ exports.createPaymentIntent = async (req, res) => {
   // 2️⃣ IDEMPOTENCY CHECK - Return existing payment attempt if found
   const existingAttempt = await PaymentAttempt.findOne({ idempotencyKey });
   if (existingAttempt) {
-    console.log(`[PAYMENT IDEMPOTENCY] Returning cached response for key: ${idempotencyKey}`);
-    
+    console.log(
+      `[PAYMENT IDEMPOTENCY] Returning cached response for key: ${idempotencyKey}`,
+    );
+
     // Add retry flag to audit logs
     await require("../utils/logger").logBookingStateChange(
       bookingId,
@@ -157,7 +189,7 @@ exports.createPaymentIntent = async (req, res) => {
       correlationId,
       null,
       "PAYMENT_RETRY",
-      { isRetry: true, originalAttemptId: existingAttempt._id }
+      { isRetry: true, originalAttemptId: existingAttempt._id },
     );
 
     return res.status(200).json({
@@ -212,10 +244,22 @@ exports.createPaymentIntent = async (req, res) => {
     };
     paymentAttempt.status = "TIMEOUT";
   } else if (force === "failure") {
-    response = await handlePaymentFailure(bookingId, amount, res, correlationId, true);
+    response = await handlePaymentFailure(
+      bookingId,
+      amount,
+      res,
+      correlationId,
+      true,
+    );
     paymentAttempt.status = "FAILED";
   } else {
-    response = await handlePaymentSuccess(bookingId, amount, res, correlationId, true);
+    response = await handlePaymentSuccess(
+      bookingId,
+      amount,
+      res,
+      correlationId,
+      true,
+    );
     paymentAttempt.status = "SUCCESS";
   }
 
@@ -227,7 +271,13 @@ exports.createPaymentIntent = async (req, res) => {
 };
 
 // ========== TASK 5.2: Payment Success Flow ==========
-async function handlePaymentSuccess(bookingId, amount, res, correlationId, returnData = false) {
+async function handlePaymentSuccess(
+  bookingId,
+  amount,
+  res,
+  correlationId,
+  returnData = false,
+) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -304,7 +354,13 @@ async function handlePaymentSuccess(bookingId, amount, res, correlationId, retur
 }
 
 // ========== TASK 5.3: Payment Failure Flow with Refund ==========
-async function handlePaymentFailure(bookingId, amount, res, correlationId, returnData = false) {
+async function handlePaymentFailure(
+  bookingId,
+  amount,
+  res,
+  correlationId,
+  returnData = false,
+) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
