@@ -1,23 +1,12 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
-// Disable buffering globally
+// Disable buffering globally FIRST
 mongoose.set('bufferCommands', false);
+mongoose.set('bufferTimeoutMS', 5000);
 
 let app = null;
-let connectionPromise = null;
-
-// Start connection on cold start
-if (!connectionPromise) {
-  connectionPromise = mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  }).catch(err => {
-    console.error("MongoDB connection failed:", err.message);
-    connectionPromise = null;
-    throw err;
-  });
-}
+let isReady = false;
 
 module.exports = async (req, res) => {
   // Handle OPTIONS preflight
@@ -30,19 +19,28 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Wait for connection to complete
-    if (connectionPromise) {
-      await connectionPromise;
-    }
-
-    // Load app once
-    if (!app) {
-      app = require("./src/app");
+    // Ensure connection and app are ready
+    if (!isReady) {
+      // Connect first
+      if (mongoose.connection.readyState === 0) {
+        await mongoose.connect(process.env.MONGO_URI, {
+          serverSelectionTimeoutMS: 10000,
+          socketTimeoutMS: 45000,
+        });
+      }
+      
+      // Then load app (which loads models)
+      if (!app) {
+        app = require("./src/app");
+      }
+      
+      isReady = true;
     }
 
     return app(req, res);
   } catch (error) {
     console.error("Handler error:", error.message);
+    isReady = false; // Reset on error
     if (!res.headersSent) {
       return res.status(500).json({
         error: "Server error",
