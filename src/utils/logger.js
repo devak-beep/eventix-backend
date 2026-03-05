@@ -2,6 +2,22 @@ const winston = require('winston');
 require('winston-mongodb');
 const Audit = require('../models/Audit.model');
 
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+
+const transports = [
+  new winston.transports.Console({
+    format: winston.format.simple()
+  })
+];
+
+// Only add file transports in non-production
+if (!isProduction) {
+  transports.push(
+    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'logs/combined.log' })
+  );
+}
+
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -9,25 +25,19 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  transports: [
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
-    new winston.transports.Console({
-      format: winston.format.simple()
-    })
-  ]
+  transports
 });
 
-// Audit logger for booking state changes (file only)
+// Audit logger - console only in production
 const auditLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
   ),
-  transports: [
-    new winston.transports.File({ filename: 'logs/audit.log' })
-  ]
+  transports: isProduction 
+    ? [new winston.transports.Console()]
+    : [new winston.transports.File({ filename: 'logs/audit.log' })]
 });
 
 async function logBookingStateChange(bookingId, fromState, toState, userId, correlationId, eventId = null, action = 'BOOKING_CREATED', metadata = {}) {
