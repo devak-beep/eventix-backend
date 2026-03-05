@@ -6,6 +6,9 @@
 // Import Mongoose - MongoDB database driver for Node.js
 const mongoose = require("mongoose");
 
+// Disable buffering globally for serverless
+mongoose.set('bufferCommands', false);
+
 /**
  * FUNCTION: Connect to MongoDB
  * Purpose: Establish connection to MongoDB database on server startup
@@ -22,8 +25,12 @@ const connectDB = async () => {
   // If connecting, wait for it
   if (mongoose.connection.readyState === 2) {
     console.log("MongoDB connection in progress, waiting...");
-    await new Promise((resolve) => {
-      mongoose.connection.once('connected', resolve);
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Connection timeout')), 15000);
+      mongoose.connection.once('connected', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
     });
     return;
   }
@@ -31,9 +38,8 @@ const connectDB = async () => {
   try {
     console.log("Connecting to MongoDB...");
     await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 15000,
       socketTimeoutMS: 45000,
-      bufferCommands: false, // Disable buffering
     });
     console.log("MongoDB connected successfully");
   } catch (error) {
