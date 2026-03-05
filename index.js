@@ -5,51 +5,46 @@ const mongoose = require("mongoose");
 mongoose.set('bufferCommands', false);
 
 let app = null;
-let isConnecting = false;
+let connectionPromise = null;
 
 async function ensureConnection() {
   // Already connected
   if (mongoose.connection.readyState === 1) {
+    console.log("Already connected");
     return true;
   }
 
-  // Connection in progress, wait for it
-  if (isConnecting) {
-    await new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (mongoose.connection.readyState === 1) {
-          clearInterval(checkInterval);
-          resolve();
-        }
-      }, 100);
-      
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        resolve();
-      }, 15000);
-    });
-    return mongoose.connection.readyState === 1;
+  // Connection in progress, wait for existing promise
+  if (connectionPromise) {
+    console.log("Waiting for existing connection...");
+    return await connectionPromise;
   }
 
   // Start new connection
-  isConnecting = true;
-  try {
-    if (!process.env.MONGO_URI) {
-      throw new Error("MONGO_URI not found in environment");
-    }
+  console.log("Starting new connection...");
+  connectionPromise = (async () => {
+    try {
+      if (!process.env.MONGO_URI) {
+        throw new Error("MONGO_URI not found");
+      }
 
-    await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 15000,
-      socketTimeoutMS: 45000,
-    });
-    
-    isConnecting = false;
-    return true;
-  } catch (error) {
-    isConnecting = false;
-    console.error("MongoDB connection error:", error.message);
-    return false;
-  }
+      console.log("Connecting to MongoDB...");
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+      });
+      
+      console.log("MongoDB connected successfully");
+      connectionPromise = null;
+      return true;
+    } catch (error) {
+      console.error("MongoDB connection failed:", error.message);
+      connectionPromise = null;
+      return false;
+    }
+  })();
+
+  return await connectionPromise;
 }
 
 module.exports = async (req, res) => {
@@ -63,8 +58,12 @@ module.exports = async (req, res) => {
   }
 
   try {
+    console.log(`Request: ${req.method} ${req.url}`);
+    
     // Ensure database connection
     const connected = await ensureConnection();
+    console.log("Connection result:", connected);
+    
     if (!connected) {
       return res.status(503).json({
         success: false,
@@ -75,12 +74,13 @@ module.exports = async (req, res) => {
 
     // Load app once (AFTER DB is connected)
     if (!app) {
+      console.log("Loading app...");
       app = require("./src/app");
     }
 
     return app(req, res);
   } catch (error) {
-    console.error("Handler error:", error.message);
+    console.error("Handler error:", error.message, error.stack);
     if (!res.headersSent) {
       return res.status(500).json({
         error: "Server error",
