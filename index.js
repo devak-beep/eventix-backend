@@ -1,50 +1,23 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
-// Disable buffering globally BEFORE any models are loaded
+// Disable buffering globally
 mongoose.set('bufferCommands', false);
 
 let app = null;
-let connectionPromise = null;
+let dbReady = false;
 
-async function ensureConnection() {
-  // Already connected
-  if (mongoose.connection.readyState === 1) {
-    console.log("Already connected");
-    return true;
-  }
-
-  // Connection in progress, wait for existing promise
-  if (connectionPromise) {
-    console.log("Waiting for existing connection...");
-    return await connectionPromise;
-  }
-
-  // Start new connection
-  console.log("Starting new connection...");
-  connectionPromise = (async () => {
-    try {
-      if (!process.env.MONGO_URI) {
-        throw new Error("MONGO_URI not found");
-      }
-
-      console.log("Connecting to MongoDB...");
-      await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 15000,
-        socketTimeoutMS: 45000,
-      });
-      
-      console.log("MongoDB connected successfully");
-      connectionPromise = null;
-      return true;
-    } catch (error) {
-      console.error("MongoDB connection failed:", error.message);
-      connectionPromise = null;
-      return false;
-    }
-  })();
-
-  return await connectionPromise;
+// Connect immediately on cold start
+if (!dbReady && process.env.MONGO_URI) {
+  mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  }).then(() => {
+    dbReady = true;
+    console.log("MongoDB connected on cold start");
+  }).catch(err => {
+    console.error("MongoDB connection failed:", err.message);
+  });
 }
 
 module.exports = async (req, res) => {
@@ -58,29 +31,23 @@ module.exports = async (req, res) => {
   }
 
   try {
-    console.log(`Request: ${req.method} ${req.url}`);
-    
-    // Ensure database connection
-    const connected = await ensureConnection();
-    console.log("Connection result:", connected);
-    
-    if (!connected) {
-      return res.status(503).json({
-        success: false,
-        message: "Database connection failed",
-        error: "Service temporarily unavailable"
-      });
+    // Wait for connection if not ready
+    if (!dbReady && mongoose.connection.readyState !== 1) {
+      let attempts = 0;
+      while (mongoose.connection.readyState !== 1 && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
     }
 
-    // Load app once (AFTER DB is connected)
+    // Load app once
     if (!app) {
-      console.log("Loading app...");
       app = require("./src/app");
     }
 
     return app(req, res);
   } catch (error) {
-    console.error("Handler error:", error.message, error.stack);
+    console.error("Handler error:", error.message);
     if (!res.headersSent) {
       return res.status(500).json({
         error: "Server error",
