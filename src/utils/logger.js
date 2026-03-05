@@ -2,7 +2,8 @@ const winston = require('winston');
 require('winston-mongodb');
 const Audit = require('../models/Audit.model');
 
-const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+// Detect serverless environment
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME);
 
 const transports = [
   new winston.transports.Console({
@@ -10,8 +11,8 @@ const transports = [
   })
 ];
 
-// Only add file transports in non-production
-if (!isProduction) {
+// Only add file transports when NOT in serverless
+if (!isServerless) {
   transports.push(
     new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
     new winston.transports.File({ filename: 'logs/combined.log' })
@@ -28,14 +29,14 @@ const logger = winston.createLogger({
   transports
 });
 
-// Audit logger - console only in production
+// Audit logger - console only in serverless
 const auditLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
   ),
-  transports: isProduction 
+  transports: isServerless 
     ? [new winston.transports.Console()]
     : [new winston.transports.File({ filename: 'logs/audit.log' })]
 });
