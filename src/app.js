@@ -53,10 +53,34 @@ app.get("/debug/db", (req, res) => {
   });
 });
 
+// DEBUG: Force connection test
+app.get("/debug/connect", async (req, res) => {
+  const mongoose = require("mongoose");
+  try {
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+      });
+    }
+    res.json({
+      success: true,
+      state: mongoose.connection.readyState,
+      message: "Connected successfully"
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // MIDDLEWARE: Check database connection before processing requests
 app.use((req, res, next) => {
-  // Skip check for debug endpoint
-  if (req.path === '/debug/db') {
+  // Skip check for debug endpoints
+  if (req.path === '/debug/db' || req.path === '/debug/connect') {
     return next();
   }
   
