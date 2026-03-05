@@ -13,19 +13,21 @@ const mongoose = require("mongoose");
  * Uses: MONGO_URI from .env file
  */
 const connectDB = async () => {
-  try {
-    // ✅ CONNECT: Use Mongoose to connect to MongoDB
-    // process.env.MONGO_URI comes from .env file
-    // Example: mongodb://127.0.0.1:27017/event_booking?replicaSet=rs0
-    await mongoose.connect(process.env.MONGO_URI);
+  // Skip if already connected (important for serverless)
+  if (mongoose.connection.readyState === 1) {
+    console.log("MongoDB already connected");
+    return;
+  }
 
-    // ✅ Log success message when connected
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
     console.log("MongoDB connected");
   } catch (error) {
-    // ❌ ERROR: If connection fails, log error and exit
     console.error("MongoDB connection failed:", error.message);
-    // Exit with code 1 (error exit) - server won't start without database
-    process.exit(1);
+    throw error; // Don't exit in serverless
   }
 };
 
