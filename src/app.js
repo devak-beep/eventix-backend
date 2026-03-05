@@ -80,17 +80,11 @@ app.get("/debug/connect", async (req, res) => {
 // MIDDLEWARE: Check database connection before processing requests
 app.use((req, res, next) => {
   // Skip check for debug endpoints
-  if (req.path === '/debug/db' || req.path === '/debug/connect') {
+  if (req.path.startsWith('/debug/')) {
     return next();
   }
   
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      success: false,
-      message: "Database not connected",
-      error: "Service temporarily unavailable"
-    });
-  }
+  // Remove the connection check - let mongoose handle it with bufferCommands: false
   next();
 });
 
