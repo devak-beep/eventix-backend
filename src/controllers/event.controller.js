@@ -170,9 +170,6 @@ exports.getAllPublicEvents = async (req, res) => {
   const events = await Event.find(filter)
     .populate("createdBy", "name email")
     .populate("approvedBy", "name email")
-    .select(
-      "name description eventDate totalSeats availableSeats type category amount currency image createdAt createdBy approvedBy createdViaRequest",
-    )
     .sort({ eventDate: 1 }); // Sort by event date (earliest first)
 
   res.status(200).json({
@@ -473,10 +470,7 @@ exports.getEventById = async (req, res) => {
 
   const event = await Event.findById(id)
     .populate("createdBy", "name email")
-    .populate("approvedBy", "name email")
-    .select(
-      "name description eventDate totalSeats availableSeats amount currency image createdAt createdBy approvedBy createdViaRequest",
-    );
+    .populate("approvedBy", "name email");
 
   if (!event) {
     return res.status(404).json({

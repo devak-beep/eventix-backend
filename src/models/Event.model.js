@@ -231,7 +231,19 @@ const eventSchema = new mongoose.Schema(
     },
   },
   // Add automatic timestamps
-  { timestamps: true },
+  {
+    timestamps: true,
+    // Transform Map to plain object when converting to JSON
+    toJSON: {
+      transform: function (doc, ret) {
+        // Convert dailySeats Map to plain object
+        if (ret.dailySeats instanceof Map) {
+          ret.dailySeats = Object.fromEntries(ret.dailySeats);
+        }
+        return ret;
+      },
+    },
+  },
 );
 
 // Create and export Event model

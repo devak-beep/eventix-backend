@@ -63,7 +63,7 @@ async function lockSeats(req, res) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
 
-    if (event.status !== "published") {
+    if (!event.isPublished) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ success: false, message: "Event is not available for booking" });
