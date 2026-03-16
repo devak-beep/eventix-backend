@@ -69,6 +69,17 @@ async function lockSeats(req, res) {
       return res.status(400).json({ success: false, message: "Event is not available for booking" });
     }
 
+    // ── Check event has not expired ───────────────────────────────────────
+    const now = new Date();
+    const expiryDate = event.eventType === "multi-day" && event.endDate
+      ? new Date(new Date(event.endDate).setHours(23, 59, 59, 999))
+      : new Date(event.eventDate);
+    if (expiryDate <= now) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "This event has already ended. Booking is no longer available." });
+    }
+
     // ── Determine effective passType ──────────────────────────────────────
     const isMultiDay = event.eventType === "multi-day";
     const effectivePassType = isMultiDay ? passType : "regular";
