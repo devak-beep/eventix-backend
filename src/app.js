@@ -105,7 +105,6 @@ app.use("/api/events", eventRoutes); // Routes: POST /, GET /:id, POST /:eventId
 app.use("/api/locks", lockRoutes); // Route: POST /
 app.use("/api/bookings", bookingRoutes); // Routes: POST /confirm, POST /:id/confirm
 app.use("/api/payments", require("./routes/payment.routes")); // Route: POST /intent
-app.use("/api/stripe", require("./routes/stripe.routes")); // Stripe payment routes
 app.use("/api/razorpay", require("./routes/razorpay.routes")); // Razorpay payment routes
 app.use("/api/jobs", require("./routes/job.routes")); // Routes: POST /expire-locks, /expire-bookings, /recover
 app.use("/api/audit", require("./routes/audit.routes")); // Routes: GET /, GET /:bookingId
