@@ -128,11 +128,29 @@ app.use("/api/cancellations", require("./routes/cancellation.routes")); // Route
 app.use("/api/event-requests", require("./routes/eventRequest.routes")); // Event creation request workflow
 
 // HEALTH CHECK ENDPOINT
-// GET /health → {"status": "OK"}
-// Used to check if server is running without any errors
-// DevOps tools use this to monitor server health
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK" });
+app.get("/health", async (req, res) => {
+  const dbState = mongoose.connection.readyState; // 1 = connected
+  if (dbState !== 1) {
+    return res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      checks: { server: "OK", database: "disconnected" },
+    });
+  }
+  try {
+    await mongoose.connection.db.admin().ping();
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      checks: { server: "OK", database: "connected" },
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      checks: { server: "OK", database: err.message },
+    });
+  }
 });
 
 // ERROR HANDLING MIDDLEWARE (must be last)
