@@ -19,10 +19,10 @@ const otpSchema = new mongoose.Schema({
     required: true,
   },
 
-  // Whether this OTP is for registration or login
+  // Whether this OTP is for registration, login, or password reset
   purpose: {
     type: String,
-    enum: ["register", "login"],
+    enum: ["register", "login", "reset"],
     required: true,
   },
 

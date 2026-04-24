@@ -19,6 +19,8 @@ const {
   verifyLoginOtp,
   resendOtp,
   updateOtpPreference,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/user.controller");
 
 // Import middleware for superAdmin routes
@@ -55,9 +57,19 @@ router.post("/verify-login-otp", verifyLoginOtp);
 // ROUTE 5: POST /api/users/resend-otp
 // Purpose: Resend OTP if user didn't receive it
 // Handler: resendOtp function
-// Request body: {email, purpose} (purpose = "register" or "login")
+// Request body: {email, purpose} (purpose = "register", "login", or "reset")
 // Response: {success: true, message}
 router.post("/resend-otp", resendOtp);
+
+// ROUTE: POST /api/users/forgot-password
+// Purpose: Send password reset OTP to email
+// Request body: {email}
+router.post("/forgot-password", forgotPassword);
+
+// ROUTE: POST /api/users/reset-password
+// Purpose: Verify OTP and set new password
+// Request body: {email, otp, newPassword}
+router.post("/reset-password", resetPassword);
 
 // ROUTE 6: PUT /api/users/:id/otp-preference
 // Purpose: Enable or disable OTP verification on login

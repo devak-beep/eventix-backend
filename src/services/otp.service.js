@@ -34,13 +34,16 @@ function createTransporter() {
 // -----------------------------------------------
 function buildEmailHtml(otp, purpose) {
   const isRegister = purpose === "register";
-  const title = isRegister ? "Verify Your Email" : "Login Verification";
+  const isReset = purpose === "reset";
+  const title = isRegister ? "Verify Your Email" : isReset ? "Reset Your Password" : "Login Verification";
   const subtitle = isRegister
     ? "You're almost there! Enter the OTP below to complete your registration."
+    : isReset
+    ? "We received a request to reset your Eventix password. Use the OTP below to proceed."
     : "A login attempt was made to your Eventix account. Use the OTP below to confirm it was you.";
-  const badgeText = isRegister ? "Registration OTP" : "Login OTP";
-  const badgeColor = isRegister ? "#00b8ff" : "#00d4ff";
-  const badgeBg = isRegister ? "#e0f7ff" : "#ccf3ff";
+  const badgeText = isRegister ? "Registration OTP" : isReset ? "Password Reset OTP" : "Login OTP";
+  const badgeColor = isRegister ? "#00b8ff" : isReset ? "#f59e0b" : "#00d4ff";
+  const badgeBg = isRegister ? "#e0f7ff" : isReset ? "#fef3c7" : "#ccf3ff";
 
   return `
 <!DOCTYPE html>
@@ -267,6 +270,8 @@ async function sendOtp(email, purpose, tempData = null) {
   const subject =
     purpose === "register"
       ? "Your Eventix Registration OTP"
+      : purpose === "reset"
+      ? "Your Eventix Password Reset OTP"
       : "Your Eventix Login OTP";
 
   await transporter.sendMail({

@@ -367,6 +367,92 @@ exports.verifyLoginOtp = async (req, res) => {
 };
 
 /**
+ * FUNCTION: Forgot Password — send OTP to email
+ * Route: POST /api/users/forgot-password
+ */
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      // Don't reveal whether email exists — always return success
+      return res.status(200).json({
+        success: true,
+        message: "If an account with that email exists, an OTP has been sent.",
+        email: normalizedEmail,
+      });
+    }
+
+    try {
+      await sendOtp(normalizedEmail, "reset");
+    } catch (otpError) {
+      if (otpError.code === "RATE_LIMITED") {
+        return res.status(200).json({
+          success: true,
+          message: "An OTP was already sent to your email. Please check your inbox.",
+          email: normalizedEmail,
+          alreadySent: true,
+        });
+      }
+      throw otpError;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent to your email. Please verify to reset your password.",
+      email: normalizedEmail,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error sending OTP", error: error.message });
+  }
+};
+
+/**
+ * FUNCTION: Reset Password — verify OTP and update password
+ * Route: POST /api/users/reset-password
+ */
+exports.resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ success: false, message: "Email, OTP, and new password are required" });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const result = await verifyOtp(normalizedEmail, otp, "reset");
+    if (!result.valid) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { email: normalizedEmail },
+      { password: newPassword },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({ success: true, message: "Password reset successfully! You can now log in." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error resetting password", error: error.message });
+  }
+};
+
+/**
  * FUNCTION: Resend OTP
  * Purpose: Allow user to request a new OTP if they didn't receive one
  * Route: POST /api/users/resend-otp
@@ -381,10 +467,10 @@ exports.resendOtp = async (req, res) => {
     });
   }
 
-  if (!["register", "login"].includes(purpose)) {
+  if (!["register", "login", "reset"].includes(purpose)) {
     return res.status(400).json({
       success: false,
-      message: "Purpose must be 'register' or 'login'",
+      message: "Purpose must be 'register', 'login', or 'reset'",
     });
   }
 
@@ -402,7 +488,7 @@ exports.resendOtp = async (req, res) => {
       });
     }
 
-    if (purpose === "login") {
+    if (purpose === "login" || purpose === "reset") {
       const user = await User.findOne({ email: normalizedEmail });
       if (!user) {
         return res.status(404).json({
